@@ -6,6 +6,12 @@ import Foundation
 public final class DownloadEngine: NSObject, @unchecked Sendable {
     public let id: UUID
     public static let maxRetries = 6
+    /// Smallest piece the tail splitter will hand to a fresh connection.
+    public static let minDynamicSplit: Int64 = 128 * 1024
+    /// Restart a connection that delivered nothing for this long.
+    static let stallTimeout: TimeInterval = 12
+    /// In the tail (spare connections, nothing left to split), restart connections slower than this.
+    static let slowTailRate: Double = 64 * 1024
 
     private let queue: DispatchQueue
     private let delegateQueue: OperationQueue
@@ -15,6 +21,7 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
 
     private var workers: [Int: SegmentWorker] = [:]
     private var retries: [Int: Int] = [:]
+    private var restarts: [Int: Int] = [:]
     private var pendingRetry: Set<Int> = []
     private var file: FileHandle?
     private var lastSave = Date.distantPast
@@ -87,6 +94,7 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
         guard !record.status.isActive, record.status != .completed, record.status != .cancelled else { return }
         generation += 1
         retries.removeAll()
+        restarts.removeAll()
         pendingRetry.removeAll()
         record.errorMessage = nil
         if record.probed {
@@ -181,6 +189,47 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
         record.status = .downloading
         saveState(force: true)
         fillWorkers()
+        scheduleWatchdog()
+    }
+
+    // MARK: Watchdog
+
+    private func scheduleWatchdog() {
+        let gen = generation
+        queue.asyncAfter(deadline: .now() + 2) { [weak self] in
+            guard let self, gen == self.generation, self.record.status == .downloading else { return }
+            self.watchdog()
+            self.scheduleWatchdog()
+        }
+    }
+
+    /// Replaces stalled connections, and in the tail replaces crawling ones: a fresh TCP connection
+    /// usually beats one stuck in loss recovery, and it stops one slow link holding up the finish.
+    private func watchdog() {
+        guard !throttled else { return }
+        let now = Date()
+        let tail = workers.count < connections
+        let limited = limiter.bytesPerSecond > 0
+        for (i, w) in workers {
+            var restart = false
+            if now.timeIntervalSince(w.lastDataAt) > Self.stallTimeout {
+                restart = true
+            } else if now.timeIntervalSince(w.markTime) >= 6 {
+                let rate = Double(w.bytes - w.markBytes) / now.timeIntervalSince(w.markTime)
+                w.markBytes = w.bytes
+                w.markTime = now
+                if tail && !limited && rate < Self.slowTailRate && record.segments[i].remaining > Self.minDynamicSplit {
+                    restart = true
+                }
+            }
+            if restart && (restarts[i] ?? 0) < 10 {
+                restarts[i, default: 0] += 1
+                workers[i] = nil
+                w.stop()
+                startWorker(i)
+            }
+        }
+        fillWorkers()
     }
 
     private func loadStateFileIfNewer() {
@@ -202,7 +251,7 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
             }
         }
         while record.acceptsRanges && workers.count < connections {
-            guard let n = SegmentMath.splitLargest(&record.segments, excluding: pendingRetry) else { break }
+            guard let n = SegmentMath.splitLargest(&record.segments, minSegment: Self.minDynamicSplit, excluding: pendingRetry) else { break }
             startWorker(n)
         }
         if workers.isEmpty && pendingRetry.isEmpty && allComplete { finish() }
@@ -258,6 +307,8 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
             return
         }
         record.segments[i].received += Int64(chunk.count)
+        w.bytes += Int64(chunk.count)
+        w.lastDataAt = Date()
         retries[i] = 0
         saveState(force: false)
         throttle(chunk.count)
@@ -431,6 +482,10 @@ final class SegmentWorker: NSObject, URLSessionDataDelegate, @unchecked Sendable
     private(set) var session: URLSession?
     private(set) var task: URLSessionDataTask?
     var failure: String?
+    var bytes: Int64 = 0
+    var lastDataAt = Date()
+    var markBytes: Int64 = 0
+    var markTime = Date()
 
     init(index: Int, engine: DownloadEngine) {
         self.index = index
@@ -461,6 +516,11 @@ final class SegmentWorker: NSObject, URLSessionDataDelegate, @unchecked Sendable
         engine?.workerReceived(self, data)
     }
 
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+        completionHandler(RedirectPolicy.request(request, from: task.originalRequest))
+    }
+
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         engine?.workerCompleted(self, error)
         session.finishTasksAndInvalidate()
@@ -481,6 +541,11 @@ final class ProbeDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable
         completionHandler(.cancel)
     }
 
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+        completionHandler(RedirectPolicy.request(request, from: task.originalRequest))
+    }
+
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         defer { session.invalidateAndCancel() }
         guard !reported else { return }
@@ -490,6 +555,17 @@ final class ProbeDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable
         } else {
             done(.failure(error ?? URLError(.badServerResponse)))
         }
+    }
+}
+
+enum RedirectPolicy {
+    /// Keeps the browser's cookies from leaking to a different site on redirect.
+    static func request(_ new: URLRequest, from original: URLRequest?) -> URLRequest {
+        guard let from = original?.url?.host?.lowercased(), let to = new.url?.host?.lowercased(),
+              from != to, !to.hasSuffix("." + from), !from.hasSuffix("." + to) else { return new }
+        var r = new
+        r.setValue(nil, forHTTPHeaderField: "Cookie")
+        return r
     }
 }
 

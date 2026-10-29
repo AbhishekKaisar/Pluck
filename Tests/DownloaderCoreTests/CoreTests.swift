@@ -223,3 +223,23 @@ import Testing
         #expect(String(data: r.body, encoding: .utf8) == "abcd")
     }
 }
+
+@Suite struct RedirectTests {
+    func req(_ s: String) -> URLRequest {
+        var r = URLRequest(url: URL(string: s)!)
+        r.setValue("sid=1", forHTTPHeaderField: "Cookie")
+        r.setValue("bytes=0-9", forHTTPHeaderField: "Range")
+        return r
+    }
+
+    @Test func sameSiteKeepsCookies() {
+        let out = RedirectPolicy.request(req("https://dl.example.com/f"), from: req("https://example.com/get"))
+        #expect(out.value(forHTTPHeaderField: "Cookie") == "sid=1")
+    }
+
+    @Test func otherSiteDropsCookiesKeepsRange() {
+        let out = RedirectPolicy.request(req("https://cdn.other.net/f"), from: req("https://example.com/get"))
+        #expect(out.value(forHTTPHeaderField: "Cookie") == nil)
+        #expect(out.value(forHTTPHeaderField: "Range") == "bytes=0-9")
+    }
+}
