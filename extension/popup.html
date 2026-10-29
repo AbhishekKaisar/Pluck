@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="light dark" />
+    <title>MacDownloader</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <span id="dot" class="dot" title="Checking"></span>
+      <h1>MacDownloader</h1>
+      <span id="status" class="muted">Checking</span>
+    </header>
+
+    <label class="row toggle">
+      <span>Catch downloads</span>
+      <input type="checkbox" id="enabled" />
+    </label>
+
+    <label class="field">
+      <span>Token <small class="muted">(MacDownloader, Settings, Copy)</small></span>
+      <input type="password" id="token" placeholder="Paste the token from the app" autocomplete="off" spellcheck="false" />
+    </label>
+
+    <div class="grid">
+      <label class="field">
+        <span>Port</span>
+        <input type="number" id="port" min="1024" max="65535" />
+      </label>
+      <label class="field">
+        <span>Minimum size (MB)</span>
+        <input type="number" id="minSizeMB" min="0" step="0.5" />
+      </label>
+    </div>
+
+    <label class="row toggle">
+      <span>Catch every file type</span>
+      <input type="checkbox" id="catchAll" />
+    </label>
+
+    <label class="field">
+      <span>File types to catch</span>
+      <textarea id="types" rows="4" spellcheck="false"></textarea>
+    </label>
+
+    <footer>
+      <button id="reset" type="button" class="secondary">Default types</button>
+      <span id="saved" class="muted"></span>
+      <button id="save" type="button">Save</button>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
