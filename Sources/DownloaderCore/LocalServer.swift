@@ -61,7 +61,7 @@ public final class LocalServer: @unchecked Sendable {
             return
         }
         let params = NWParameters.tcp
-        params.allowLocalEndpointReuse = false
+        params.allowLocalEndpointReuse = true
         params.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: port)!)
         params.acceptLocalOnly = true
         let l: NWListener

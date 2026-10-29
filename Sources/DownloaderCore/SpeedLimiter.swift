@@ -22,6 +22,15 @@ public final class SpeedLimiter: @unchecked Sendable {
         }
     }
 
+    /// Seconds until the bucket is back to zero (0 when there is budget or no limit).
+    public func waitTime() -> TimeInterval {
+        lock.withLock {
+            guard rate > 0 else { return 0 }
+            let projected = min(rate / 4, tokens + Date().timeIntervalSince(last) * rate)
+            return projected < 0 ? -projected / rate : 0
+        }
+    }
+
     /// Records `bytes` received and returns how long the caller should hold off (0 when under budget).
     public func consume(_ bytes: Int) -> TimeInterval {
         lock.withLock {

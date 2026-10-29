@@ -51,7 +51,7 @@ Safari is not supported: a Safari extension has to be built and signed with Xcod
   - `POST /add` with `{"url", "filename"?, "referrer"?, "cookies"?, "userAgent"?, "fileSize"?}` and header `X-MacDownloader-Token: <token>` (or `Authorization: Bearer <token>`).
   - `GET /list`, `POST /control` with `{"id", "action": "pause" | "resume" | "cancel"}`, both with the token.
   - Requests without the token get 401. Requests carrying a web page `Origin` get 403. Only loopback connections are accepted.
-- Command line: `build/mdl [-c connections] [-o directory] [-n filename] URL`. Ctrl-C pauses and saves state; the same command again resumes.
+- Command line: `build/mdl [-c connections] [-o directory] [-n filename] [-l KiB/s] URL`. Ctrl-C pauses and saves state; the same command again resumes.
 
 ## Files
 
@@ -72,6 +72,6 @@ scripts/make-icons.swift  draws the icons
 - Safari is out of scope (needs Xcode).
 - Each connection uses its own `URLSession`, so it gets its own TCP connection; one shared session would multiplex everything over one HTTP/2 connection and lose the speed-up. Some servers cap or block clients that open many connections; lower the connection count for those.
 - Cookies are sent as a plain `Cookie` header and dropped when a redirect leads to an unrelated host, which can break the rare download that needs the same cookies on a different domain.
-- The speed limit pauses connections in short bursts, so the speed it shows wobbles around the limit.
+- With a speed limit on, each connection fetches small ranges paced by a shared token bucket, so the network itself stays under the limit (measured 1.03 MB/s on the wire at a 1024 KiB/s limit). Servers without range support are not limited.
 - Downloads that need a POST body, or a page-bound token that the browser holds outside cookies, cannot be repeated by the app; turn the extension off for those sites or use the browser.
 - No browser integration for Firefox or Safari, no video grabbing from pages, no scheduler.

@@ -2,7 +2,7 @@ import Foundation
 import DownloaderCore
 
 // mdl: command-line front end to the MacDownloader engine.
-// usage: mdl [-c connections] [-o directory] [-n filename] URL
+// usage: mdl [-c connections] [-o directory] [-n filename] [-l KiB/s] URL
 // Ctrl-C pauses and saves resume state; run the same command again to resume.
 
 var connections = 8
@@ -16,14 +16,15 @@ while !args.isEmpty {
     case "-c": connections = Int(args.isEmpty ? "8" : args.removeFirst()) ?? 8
     case "-o": directory = args.isEmpty ? directory : args.removeFirst()
     case "-n": name = args.isEmpty ? nil : args.removeFirst()
+    case "-l": SpeedLimiter.shared.bytesPerSecond = Int64(args.isEmpty ? "0" : args.removeFirst())! * 1024
     case "-h", "--help":
-        print("usage: mdl [-c connections] [-o directory] [-n filename] URL")
+        print("usage: mdl [-c connections] [-o directory] [-n filename] [-l KiB/s] URL")
         exit(0)
     default: urlString = a
     }
 }
 guard let s = urlString, let url = URL(string: s) else {
-    FileHandle.standardError.write(Data("usage: mdl [-c connections] [-o directory] [-n filename] URL\n".utf8))
+    FileHandle.standardError.write(Data("usage: mdl [-c connections] [-o directory] [-n filename] [-l KiB/s] URL\n".utf8))
     exit(2)
 }
 

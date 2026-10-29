@@ -243,3 +243,18 @@ import Testing
         #expect(out.value(forHTTPHeaderField: "Range") == "bytes=0-9")
     }
 }
+
+@Suite struct LimiterTests {
+    @Test func holdsBackWhenOverBudget() {
+        let l = SpeedLimiter()
+        l.bytesPerSecond = 1024 * 1024
+        #expect(l.consume(100_000) == 0)
+        let d = l.consume(1_000_000)
+        #expect(d > 0.7 && d < 1.0)
+    }
+
+    @Test func unlimitedNeverWaits() {
+        let l = SpeedLimiter()
+        #expect(l.consume(10_000_000) == 0)
+    }
+}

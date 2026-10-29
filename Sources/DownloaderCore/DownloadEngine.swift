@@ -25,7 +25,6 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
     private var pendingRetry: Set<Int> = []
     private var file: FileHandle?
     private var lastSave = Date.distantPast
-    private var throttled = false
     private var probeSession: URLSession?
     /// Bumped by pause and cancel so late callbacks from an old run are ignored.
     private var generation = 0
@@ -206,9 +205,8 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
     /// Replaces stalled connections, and in the tail replaces crawling ones: a fresh TCP connection
     /// usually beats one stuck in loss recovery, and it stops one slow link holding up the finish.
     private func watchdog() {
-        guard !throttled else { return }
         let now = Date()
-        let tail = workers.count < connections
+        let tail = busySlots < connections
         let limited = limiter.bytesPerSecond > 0
         for (i, w) in workers {
             var restart = false
@@ -221,6 +219,13 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
                 if tail && !limited && rate < Self.slowTailRate && record.segments[i].remaining > Self.minDynamicSplit {
                     restart = true
                 }
+            }
+            if limited && w.pieceEnd == nil && record.acceptsRanges && !record.segments[i].isOpenEnded {
+                // The limit was switched on mid-transfer: move this connection to paced pieces.
+                workers[i] = nil
+                w.stop()
+                startWorker(i)
+                continue
             }
             if restart && (restarts[i] ?? 0) < 10 {
                 restarts[i, default: 0] += 1
@@ -245,29 +250,44 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
     /// Keeps every connection busy: start idle segments, then split the largest running one.
     private func fillWorkers() {
         guard record.status == .downloading else { return }
-        for i in record.segments.indices where workers.count < connections {
+        for i in record.segments.indices where busySlots < connections {
             if !record.segments[i].isComplete && workers[i] == nil && !pendingRetry.contains(i) {
                 startWorker(i)
             }
         }
-        while record.acceptsRanges && workers.count < connections {
+        while record.acceptsRanges && busySlots < connections {
             guard let n = SegmentMath.splitLargest(&record.segments, minSegment: Self.minDynamicSplit, excluding: pendingRetry) else { break }
             startWorker(n)
         }
         if workers.isEmpty && pendingRetry.isEmpty && allComplete { finish() }
     }
 
+    /// Connections in use, counting segments resting between paced pieces or waiting to retry.
+    private var busySlots: Int { workers.count + pendingRetry.count }
+
     private var allComplete: Bool { !record.segments.isEmpty && record.segments.allSatisfy(\.isComplete) }
 
-    private func startWorker(_ i: Int) {
+    private func startWorker(_ i: Int, reusing existing: SegmentWorker? = nil) {
         var req = URLRequest(url: record.url, timeoutInterval: 30)
         record.headers.apply(to: &req)
+        var pieceEnd: Int64?
         if record.acceptsRanges {
-            if let r = SegmentMath.rangeHeader(for: record.segments[i]) { req.setValue(r, forHTTPHeaderField: "Range") }
+            let seg = record.segments[i]
+            let rate = limiter.bytesPerSecond
+            if rate > 0, !seg.isOpenEnded {
+                // Speed limit on: fetch in paced pieces, so the network never runs ahead of the limit.
+                let piece = min(4 << 20, max(64 << 10, rate / Int64(max(1, connections)) / 2))
+                pieceEnd = min(seg.end, seg.current + piece - 1)
+                req.setValue("bytes=\(seg.current)-\(pieceEnd!)", forHTTPHeaderField: "Range")
+            } else if let r = SegmentMath.rangeHeader(for: seg) {
+                req.setValue(r, forHTTPHeaderField: "Range")
+            }
         } else {
             record.segments[i].received = 0
         }
-        let w = SegmentWorker(index: i, engine: self)
+        let w = existing ?? SegmentWorker(index: i, engine: self)
+        w.pieceEnd = pieceEnd
+        w.failure = nil
         workers[i] = w
         w.start(req, delegateQueue: delegateQueue)
     }
@@ -331,11 +351,33 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
             finish()
             return
         }
+        if !seg.isComplete, let pieceEnd = w.pieceEnd, seg.current > pieceEnd {
+            // Paced piece done: wait until the limiter has budget, then fetch the next piece
+            // on the same session so the connection is reused.
+            w.keepSession = true
+            pendingRetry.insert(i)
+            let gen = generation
+            queue.asyncAfter(deadline: .now() + limiter.waitTime()) { [weak self] in
+                guard let self, gen == self.generation, self.record.status == .downloading,
+                      !self.record.segments[i].isComplete else {
+                    w.stop()
+                    self?.queue.async { self?.fillWorkersIfDownloading() }
+                    return
+                }
+                self.pendingRetry.remove(i)
+                self.startWorker(i, reusing: w)
+            }
+            return
+        }
         if !seg.isComplete {
             scheduleRetry(i, "Connection closed early")
             return
         }
         segmentFinished()
+    }
+
+    private func fillWorkersIfDownloading() {
+        if record.status == .downloading { segmentFinished() }
     }
 
     /// A segment reached its end while its request was still open (it was split, or the server sent extra).
@@ -387,18 +429,9 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
         }
     }
 
+    /// Accounts for bytes against the global limit. The pacing itself happens per piece in startWorker.
     private func throttle(_ bytes: Int) {
-        let delay = limiter.consume(bytes)
-        guard delay > 0.02, !throttled else { return }
-        throttled = true
-        workers.values.forEach { $0.task?.suspend() }
-        let gen = generation
-        queue.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self else { return }
-            self.throttled = false
-            guard gen == self.generation else { return }
-            self.workers.values.forEach { $0.task?.resume() }
-        }
+        _ = limiter.consume(bytes)
     }
 
     // MARK: Finish and failure
@@ -445,7 +478,6 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
         for w in workers.values { w.stop() }
         workers.removeAll()
         pendingRetry.removeAll()
-        throttled = false
     }
 
     private func closeFile() {
@@ -482,6 +514,10 @@ final class SegmentWorker: NSObject, URLSessionDataDelegate, @unchecked Sendable
     private(set) var session: URLSession?
     private(set) var task: URLSessionDataTask?
     var failure: String?
+    /// Last byte of the current paced piece (speed limit on), else nil.
+    var pieceEnd: Int64?
+    /// Set by the engine when the next piece will reuse this session.
+    var keepSession = false
     var bytes: Int64 = 0
     var lastDataAt = Date()
     var markBytes: Int64 = 0
@@ -493,7 +529,9 @@ final class SegmentWorker: NSObject, URLSessionDataDelegate, @unchecked Sendable
     }
 
     func start(_ request: URLRequest, delegateQueue: OperationQueue) {
-        let s = URLSession(configuration: DownloadEngine.makeConfiguration(), delegate: self, delegateQueue: delegateQueue)
+        keepSession = false
+        lastDataAt = Date()
+        let s = session ?? URLSession(configuration: DownloadEngine.makeConfiguration(), delegate: self, delegateQueue: delegateQueue)
         session = s
         let t = s.dataTask(with: request)
         task = t
@@ -523,7 +561,7 @@ final class SegmentWorker: NSObject, URLSessionDataDelegate, @unchecked Sendable
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         engine?.workerCompleted(self, error)
-        session.finishTasksAndInvalidate()
+        if !keepSession { session.finishTasksAndInvalidate() }
     }
 }
 
