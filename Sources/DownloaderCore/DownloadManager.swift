@@ -8,15 +8,23 @@ public final class DownloadManager: ObservableObject {
     @Published public private(set) var items: [DownloadRecord] = []
     @Published public private(set) var speeds: [UUID: Double] = [:]
     @Published public private(set) var totalSpeed: Double = 0
+    /// Connections open right now, per running download.
+    @Published public private(set) var activeConnections: [UUID: Int] = [:]
+    /// Completed downloads whose file is no longer on disk. Derived, never saved.
+    @Published public private(set) var missing: Set<UUID> = []
     @Published public var settings: AppSettings {
         didSet {
             let c = settings.clamped
             if c != settings { settings = c; return }
+            guard persists else { return }
             SpeedLimiter.shared.bytesPerSecond = Int64(settings.speedLimitKiB) * 1024
             Persistence.save(settings, to: Persistence.settingsURL)
             schedule()
         }
     }
+
+    /// False for the in-memory manager used by snapshots and tests: no disk, no network.
+    public let persists: Bool
 
     private var engines: [UUID: DownloadEngine] = [:]
     private var meters: [UUID: SpeedMeter] = [:]
@@ -25,6 +33,7 @@ public final class DownloadManager: ObservableObject {
     private var listDirty = false
 
     public init() {
+        persists = true
         settings = Persistence.load(AppSettings.self, from: Persistence.settingsURL)?.clamped ?? AppSettings()
         SpeedLimiter.shared.bytesPerSecond = Int64(settings.speedLimitKiB) * 1024
         var loaded = Persistence.load([DownloadRecord].self, from: Persistence.downloadsURL) ?? []
@@ -33,18 +42,35 @@ public final class DownloadManager: ObservableObject {
             loaded[i].status = .queued
         }
         items = loaded
+        refreshMissing()
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
         schedule()
     }
 
+    /// A list that lives only in memory and never starts a transfer. For snapshots and tests.
+    public init(inMemory items: [DownloadRecord], settings: AppSettings = AppSettings(),
+                speeds: [UUID: Double] = [:], connections: [UUID: Int] = [:], missing: Set<UUID>? = nil) {
+        persists = false
+        self.settings = settings
+        self.items = items
+        let ids = Set(items.map(\.id))
+        self.speeds = speeds.filter { ids.contains($0.key) }
+        self.totalSpeed = self.speeds.values.reduce(0, +)
+        self.activeConnections = connections.filter { ids.contains($0.key) }
+        if let missing { self.missing = missing } else { refreshMissing() }
+    }
+
     // MARK: Commands
 
     @discardableResult
-    public func add(url: URL, fileName: String? = nil, headers: RequestHeaders = RequestHeaders(), expectedSize: Int64? = nil, directory: String? = nil) -> UUID {
-        let record = DownloadRecord(url: url, fileName: fileName, directory: directory ?? settings.downloadDirectory,
+    public func add(url: URL, fileName: String? = nil, headers: RequestHeaders = RequestHeaders(), expectedSize: Int64? = nil,
+                    directory: String? = nil, connections: Int? = nil, startPaused: Bool = false) -> UUID {
+        var record = DownloadRecord(url: url, fileName: fileName, directory: directory ?? settings.downloadDirectory,
                                     headers: headers, expectedSize: expectedSize)
+        record.connections = connections.map { min(SegmentMath.maxConnections, max(1, $0)) }
+        if startPaused { record.status = .paused }
         items.insert(record, at: 0)
         markDirty(force: true)
         schedule()
@@ -94,8 +120,52 @@ public final class DownloadManager: ObservableObject {
     public func remove(_ id: UUID) {
         if let r = items.first(where: { $0.id == id }), r.status != .completed { cancel(id) }
         items.removeAll { $0.id == id }
+        missing.remove(id)
         markDirty(force: true)
     }
+
+    /// Removes from the list and deletes the file: a finished file goes to the Trash, partial data is deleted.
+    public func deleteFiles(_ id: UUID) {
+        guard let r = item(id) else { return }
+        if r.status == .completed {
+            if FileManager.default.fileExists(atPath: r.finalPath) {
+                try? FileManager.default.trashItem(at: URL(fileURLWithPath: r.finalPath), resultingItemURL: nil)
+            }
+            items.removeAll { $0.id == id }
+            missing.remove(id)
+            markDirty(force: true)
+        } else {
+            remove(id)
+        }
+    }
+
+    /// Starts the same link again as a new download and drops the old row.
+    @discardableResult
+    public func downloadAgain(_ id: UUID) -> UUID? {
+        guard let r = item(id) else { return nil }
+        let new = add(url: r.url, fileName: r.nameIsFixed ? r.fileName : nil, headers: r.headers, directory: r.directory,
+                      connections: r.connections)
+        if r.status == .completed || r.status == .cancelled {
+            items.removeAll { $0.id == id }
+            missing.remove(id)
+        } else {
+            remove(id)
+        }
+        markDirty(force: true)
+        return new
+    }
+
+    /// Re-checks which completed files are gone from disk. Call on launch and when the window comes to the front.
+    public func refreshMissing() {
+        let gone = Self.missingIDs(in: items) { FileManager.default.fileExists(atPath: $0) }
+        if gone != missing { missing = gone }
+    }
+
+    nonisolated public static func missingIDs(in items: [DownloadRecord], exists: (String) -> Bool) -> Set<UUID> {
+        Set(items.filter { $0.status == .completed && !exists($0.finalPath) }.map(\.id))
+    }
+
+    public func setSpeedLimit(on: Bool) { settings.setSpeedLimit(on: on) }
 
     public func clearFinished() {
         items.removeAll { $0.status == .completed || $0.status == .cancelled }
@@ -127,12 +197,13 @@ public final class DownloadManager: ObservableObject {
     // MARK: Scheduling
 
     private func schedule() {
+        guard persists else { return }
         let running = engines.count
         var slots = settings.maxConcurrent - running
         guard slots > 0 else { return }
         // Oldest first.
         for r in items.reversed() where slots > 0 && r.status == .queued && engines[r.id] == nil {
-            let e = DownloadEngine(record: r, connections: settings.connections)
+            let e = DownloadEngine(record: r, connections: r.connections ?? settings.connections)
             engines[r.id] = e
             meters[r.id] = SpeedMeter()
             e.start()
@@ -143,7 +214,9 @@ public final class DownloadManager: ObservableObject {
     private func tick() {
         var total: Double = 0
         var finished: [UUID] = []
+        var conns: [UUID: Int] = [:]
         for (id, e) in engines {
+            conns[id] = e.activeConnections
             let r = e.snapshot()
             update(r)
             meters[id, default: SpeedMeter()].add(bytes: r.downloadedBytes)
@@ -161,6 +234,8 @@ public final class DownloadManager: ObservableObject {
             markDirty(force: true)
         }
         totalSpeed = total
+        if conns != activeConnections { activeConnections = conns }
+        if !finished.isEmpty { refreshMissing() }
         if !engines.isEmpty { listDirty = true }
         if !finished.isEmpty { schedule() }
         if listDirty && Date().timeIntervalSince(lastListSave) > 3 { saveList() }
@@ -182,6 +257,7 @@ public final class DownloadManager: ObservableObject {
     }
 
     private func saveList() {
+        guard persists else { listDirty = false; return }
         Persistence.save(items, to: Persistence.downloadsURL)
         lastListSave = Date()
         listDirty = false

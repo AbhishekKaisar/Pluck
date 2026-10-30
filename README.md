@@ -15,6 +15,17 @@ No Electron, no third-party dependencies: Swift, SwiftUI, AppKit, `URLSession` a
 - **Live speed and ETA** per item over a 4 second sliding window, total speed in the menu bar.
 - **Persistent list** in `~/Library/Application Support/MacDownloader/downloads.json`.
 
+## The window
+
+- One clean list: checkbox, real file-type icon, name, size, status (inline progress, percent, time left), speed, date added, and a ⋯ menu per row. Date and then speed hide as the window narrows.
+- Sort (newest, oldest, name, size, status), filter (active, completed, missing files, file type) and search work together; sort and filter are remembered.
+- Select rows with the checkboxes, Cmd-click or Shift-click; the toolbar turns into an action bar (Resume, Pause, Remove from list, Delete files).
+- Select one row to see its details: link (Copy), saved path (Reveal in Finder), connections in use and a live segment map of every part of the file.
+- Add download (Cmd+N) fills in links from the clipboard, takes many links at once, checks a single link for its name, size and resume support, and lets you pick the folder and connections, or add it paused with Download later.
+- Drag a link or a `.txt` of links anywhere onto the window. Cmd+V on the list, Space pauses or resumes, Delete removes, Cmd+Delete deletes files, Cmd+F searches, Cmd+, opens Settings.
+- Finished files deleted from disk show as "File missing" (checked on launch and whenever the window comes to the front).
+- The status bar has the speed-limit toggle (tortoise; the limit itself is in Settings), total speed, active count and Done count.
+
 ## Build
 
 Needs the Swift command line tools (Swift 6). Xcode is not needed.
@@ -23,6 +34,8 @@ Needs the Swift command line tools (Swift 6). Xcode is not needed.
 cd ~/Documents/MacDownloader
 ./build.sh          # release build, assembles and ad-hoc signs build/MacDownloader.app, plus build/mdl
 ./test.sh           # unit tests (swift-testing)
+swift build --build-system native --product snapshot && "$(swift build --build-system native --show-bin-path)/snapshot"
+                    # renders the real views with sample data into build/snapshots/*.png, light and dark
 open build/MacDownloader.app
 ```
 
@@ -35,7 +48,7 @@ To install, drag `build/MacDownloader.app` into `/Applications` (or `cp -R build
 1. Open `chrome://extensions` (Chrome) or `edge://extensions` (Edge).
 2. Turn on **Developer mode**.
 3. Click **Load unpacked** and choose `~/Documents/MacDownloader/extension`.
-4. Pin the extension, click its icon and paste the token: in MacDownloader, open **Settings** (the gear in the toolbar) and click **Copy** next to the token. Click **Save**.
+4. Pin the extension, click its icon and paste the token: in MacDownloader, open **Settings** (Cmd+, or the ☰ menu) and click **Copy** next to the token. Click **Save**.
 5. The dot in the popup turns green when the app is reachable.
 
 From then on, a download that matches the file-type list and is at least the minimum size (1 MB by default) is handed to MacDownloader and removed from the browser's download list. If the app is not running, the token is wrong or the hand-over fails for any reason, the browser download carries on untouched, so nothing is lost. `blob:` and `data:` downloads and incognito windows are always left to the browser. Right-click a link and choose **Download with MacDownloader** to send any link.
@@ -44,12 +57,12 @@ Safari is not supported: a Safari extension has to be built and signed with Xcod
 
 ## Other ways in
 
-- Paste one or more links into the field at the top of the window.
+- Add download (Cmd+N), Cmd+V on the list, drag and drop, or ☰ > Import links from file.
 - URL scheme: `open "macdownloader://add?url=https%3A%2F%2Fexample.com%2Ffile.zip"` (optional `filename` and `referrer`).
 - Local API on `127.0.0.1:6801` (the next free port up to 6820 if taken; the chosen port is in `server.json`):
   - `GET /ping`: no token, returns the app name and version.
   - `POST /add` with `{"url", "filename"?, "referrer"?, "cookies"?, "userAgent"?, "fileSize"?}` and header `X-MacDownloader-Token: <token>` (or `Authorization: Bearer <token>`).
-  - `GET /list`, `POST /control` with `{"id", "action": "pause" | "resume" | "cancel"}`, both with the token.
+  - `GET /list`, `POST /control` with `{"id", "action": "pause" | "resume" | "cancel" | "remove"}` (remove keeps a finished file on disk), both with the token.
   - Requests without the token get 401. Requests carrying a web page `Origin` get 403. Only loopback connections are accepted.
 - Command line: `build/mdl [-c connections] [-o directory] [-n filename] [-l KiB/s] URL`. Ctrl-C pauses and saves state; the same command again resumes.
 
@@ -60,7 +73,9 @@ Package.swift
 build.sh, test.sh
 Resources/Info.plist, AppIcon.icns
 Sources/DownloaderCore/   engine, segment maths, file naming, manager, local server
-Sources/MacDownloader/    SwiftUI app: window, settings sheet, menu bar extra
+Sources/MacDownloaderUI/  SwiftUI views: window, table, detail panel, Add sheet, settings, menu bar extra
+Sources/MacDownloader/    app entry point, menus and keyboard commands
+Sources/snapshot/         offscreen renderer for the views (build/snapshots)
 Sources/mdl/              command line front end to the engine
 Tests/DownloaderCoreTests/
 extension/                Manifest V3 extension for Chrome and Edge

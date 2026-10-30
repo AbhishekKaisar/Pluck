@@ -211,8 +211,8 @@ public enum APIRouter {
         case ("POST", "/control"):
             guard let obj = try? JSONSerialization.jsonObject(with: req.body) as? [String: Any],
                   let idString = obj["id"] as? String, let id = UUID(uuidString: idString),
-                  let action = obj["action"] as? String, ["pause", "resume", "cancel"].contains(action) else {
-                return .respond(HTTPResponse(status: 400, json: ["error": "need {id, action: pause|resume|cancel}"]))
+                  let action = obj["action"] as? String, ["pause", "resume", "cancel", "remove"].contains(action) else {
+                return .respond(HTTPResponse(status: 400, json: ["error": "need {id, action: pause|resume|cancel|remove}"]))
             }
             return .run(.control(id: id, action: action))
         default:

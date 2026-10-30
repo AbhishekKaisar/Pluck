@@ -10,7 +10,10 @@ let package = Package(
     ],
     targets: [
         .target(name: "DownloaderCore"),
-        .executableTarget(name: "MacDownloader", dependencies: ["DownloaderCore"]),
+        .target(name: "MacDownloaderUI", dependencies: ["DownloaderCore"]),
+        .executableTarget(name: "MacDownloader", dependencies: ["DownloaderCore", "MacDownloaderUI"]),
+        // Renders the real views with sample data into build/snapshots/*.png (no screen recording needed).
+        .executableTarget(name: "snapshot", dependencies: ["DownloaderCore", "MacDownloaderUI"]),
         .executableTarget(name: "mdl", dependencies: ["DownloaderCore"]),
         .testTarget(name: "DownloaderCoreTests", dependencies: ["DownloaderCore"]),
     ],

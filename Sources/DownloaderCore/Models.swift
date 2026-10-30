@@ -49,6 +49,8 @@ public struct DownloadRecord: Codable, Identifiable, Equatable, Sendable {
     public var completedAt: Date?
     /// Name came from the user or the browser; do not replace it with the server's.
     public var nameIsFixed: Bool
+    /// Connections chosen for this download in the Add sheet; nil uses the setting.
+    public var connections: Int?
 
     public init(url: URL, fileName: String?, directory: String, headers: RequestHeaders, expectedSize: Int64? = nil) {
         self.id = UUID()
@@ -84,15 +86,40 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var downloadDirectory: String
     public var connections: Int
     public var maxConcurrent: Int
-    /// KiB per second; 0 means no limit.
+    /// The limit in force, in KiB per second; 0 means no limit.
     public var speedLimitKiB: Int
+    /// The limit the speed-limit toggle applies, remembered while the limit is off.
+    public var speedLimitValueKiB: Int
 
     public init(downloadDirectory: String = (NSHomeDirectory() as NSString).appendingPathComponent("Downloads"),
-                connections: Int = 16, maxConcurrent: Int = 3, speedLimitKiB: Int = 0) {
+                connections: Int = 16, maxConcurrent: Int = 3, speedLimitKiB: Int = 0, speedLimitValueKiB: Int? = nil) {
         self.downloadDirectory = downloadDirectory
         self.connections = connections
         self.maxConcurrent = maxConcurrent
         self.speedLimitKiB = speedLimitKiB
+        self.speedLimitValueKiB = speedLimitValueKiB ?? (speedLimitKiB > 0 ? speedLimitKiB : 1024)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case downloadDirectory, connections, maxConcurrent, speedLimitKiB, speedLimitValueKiB
+    }
+
+    /// Settings files written before the speed-limit toggle have no `speedLimitValueKiB`.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = AppSettings()
+        self.init(downloadDirectory: try c.decodeIfPresent(String.self, forKey: .downloadDirectory) ?? d.downloadDirectory,
+                  connections: try c.decodeIfPresent(Int.self, forKey: .connections) ?? d.connections,
+                  maxConcurrent: try c.decodeIfPresent(Int.self, forKey: .maxConcurrent) ?? d.maxConcurrent,
+                  speedLimitKiB: try c.decodeIfPresent(Int.self, forKey: .speedLimitKiB) ?? 0,
+                  speedLimitValueKiB: try c.decodeIfPresent(Int.self, forKey: .speedLimitValueKiB))
+    }
+
+    public var speedLimitOn: Bool { speedLimitKiB > 0 }
+
+    /// Turns the limit on at `speedLimitValueKiB`, or off.
+    public mutating func setSpeedLimit(on: Bool) {
+        speedLimitKiB = on ? max(1, speedLimitValueKiB) : 0
     }
 
     public var clamped: AppSettings {
@@ -100,6 +127,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         s.connections = min(SegmentMath.maxConnections, max(1, connections))
         s.maxConcurrent = min(10, max(1, maxConcurrent))
         s.speedLimitKiB = max(0, speedLimitKiB)
+        s.speedLimitValueKiB = max(1, speedLimitValueKiB)
         return s
     }
 }
