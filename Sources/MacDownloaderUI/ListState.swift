@@ -28,6 +28,9 @@ public final class ListState: ObservableObject {
     /// Bumped by Cmd+F; the search field takes focus when it changes.
     @Published public var searchFocusRequest = 0
     var anchor: UUID?
+    /// The rows in the order the table shows them, for Shift-click ranges. Not published:
+    /// the table writes it while it draws.
+    var rowOrder: [UUID] = []
 
     private let persists: Bool
 

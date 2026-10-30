@@ -41,6 +41,10 @@ open build/MacDownloader.app
 
 To install, drag `build/MacDownloader.app` into `/Applications` (or `cp -R build/MacDownloader.app /Applications/`). Because it is ad-hoc signed, the first launch from Finder may need right-click, Open.
 
+To try a build without touching your own list, point it at a scratch folder: `MACDOWNLOADER_SUPPORT_DIR=/tmp/md-test build/MacDownloader.app/Contents/MacOS/MacDownloader`. It takes the next free port if the installed app holds 6801.
+
+The app does no periodic work when nothing is downloading: the progress timer (2 Hz) runs only while a transfer is active, and only values that changed are published.
+
 `build.sh` passes `--build-system native` because the default SwiftPM build system fails on this machine without Xcode. `test.sh` adds the framework paths that swift-testing needs with the command line tools only.
 
 ## Install the browser extension (Chrome or Edge)

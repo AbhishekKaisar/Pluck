@@ -16,6 +16,9 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp "$BIN/mdl" build/mdl
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
+# Drop local symbols: the app binary shrinks by more than half; no effect on speed.
+strip -x "$APP/Contents/MacOS/MacDownloader" build/mdl
+
 codesign --force --deep -s - "$APP"
 codesign --force -s - build/mdl
 codesign --verify --deep "$APP"

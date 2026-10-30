@@ -12,17 +12,22 @@ struct DownloadTable: View {
         let rows = ui.visible(manager)
         let order = rows.map(\.id)
         let actions = RowActions(manager: manager, ui: ui)
+        let _ = ui.rowOrder = order
         VStack(spacing: 0) {
             HeaderRow(columns: columns)
             GeometryReader { geo in
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(rows) { r in
-                            DownloadRow(record: r, columns: columns, selected: ui.selection.contains(r.id)) {
+                            DownloadRow(manager: manager, ui: ui, record: r, columns: columns,
+                                        selected: ui.selection.contains(r.id), missing: manager.missing.contains(r.id),
+                                        speed: manager.speeds[r.id] ?? 0, eta: manager.eta(for: r)) {
+                                // Reads the order when clicked: an unchanged row keeps its first closure.
                                 focused = true
-                                ui.click(r.id, in: order, modifiers: NSEvent.modifierFlags)
-                                if (NSApp.currentEvent?.clickCount ?? 1) >= 2 { actions.open(r) }
+                                ui.click(r.id, in: ui.rowOrder, modifiers: NSEvent.modifierFlags)
+                                if (NSApp.currentEvent?.clickCount ?? 1) >= 2, let now = manager.item(r.id) { actions.open(now) }
                             }
+                            .equatable()
                         }
                         if rows.isEmpty { noMatches }
                         let used = CGFloat(rows.count) * Columns.rowHeight + (rows.isEmpty ? 90 : 0)
@@ -127,18 +132,28 @@ struct HeaderRow: View {
     }
 }
 
-struct DownloadRow: View {
-    @EnvironmentObject private var manager: DownloadManager
-    @EnvironmentObject private var ui: ListState
+/// One row. It does not observe the manager: the table passes in the values it shows, and
+/// `==` lets SwiftUI skip rows whose values did not change, so a progress tick redraws only
+/// the rows that are downloading.
+struct DownloadRow: View, Equatable {
+    let manager: DownloadManager
+    let ui: ListState
     let record: DownloadRecord
     let columns: Columns
     let selected: Bool
+    let missing: Bool
+    let speed: Double
+    let eta: TimeInterval?
     let onClick: () -> Void
     @ViewState private var hover = false
 
+    nonisolated static func == (a: DownloadRow, b: DownloadRow) -> Bool {
+        a.record == b.record && a.columns == b.columns && a.selected == b.selected && a.missing == b.missing
+            && a.speed == b.speed && a.eta == b.eta
+    }
+
     var body: some View {
         let r = record
-        let missing = manager.missing.contains(r.id)
         HStack(spacing: 10) {
             CheckBox(mark: selected ? .on : .off) { ui.toggle(r.id) }
             Image(nsImage: FileIcons.icon(for: r, missing: missing))
@@ -164,14 +179,13 @@ struct DownloadRow: View {
                 .foregroundStyle(r.totalSize == nil ? Color.secondary.opacity(0.7) : Color.secondary)
                 .monospacedDigit()
                 .frame(width: Columns.size, alignment: .trailing)
-            StatusCell(record: r, missing: missing, speed: manager.speeds[r.id] ?? 0, eta: manager.eta(for: r),
-                       showSpeed: !columns.showSpeed)
+            StatusCell(record: r, missing: missing, speed: speed, eta: eta, showSpeed: !columns.showSpeed)
                 .frame(width: columns.status, alignment: .leading)
                 .padding(.leading, 14)
             if columns.showSpeed {
                 Group {
                     if r.status == .downloading {
-                        Text(Format.speed(manager.speeds[r.id] ?? 0)).foregroundStyle(.primary)
+                        Text(Format.speed(speed)).foregroundStyle(.primary)
                     } else {
                         Text("–").foregroundStyle(.quaternary)
                     }
@@ -188,7 +202,7 @@ struct DownloadRow: View {
                     .frame(width: Columns.date, alignment: .trailing)
             }
             Menu {
-                RowMenuItems(record: r)
+                RowMenuItems(manager: manager, ui: ui, record: r, missing: missing)
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 13, weight: .semibold))
             }
@@ -207,7 +221,7 @@ struct DownloadRow: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: onClick)
         .onHover { hover = $0 }
-        .contextMenu { RowMenuItems(record: r) }
+        .contextMenu { RowMenuItems(manager: manager, ui: ui, record: r, missing: missing) }
     }
 }
 
@@ -294,15 +308,16 @@ struct SlimBar: View {
     }
 }
 
+/// A row's menu. Like the row, it takes its values rather than observing the manager.
 struct RowMenuItems: View {
-    @EnvironmentObject private var manager: DownloadManager
-    @EnvironmentObject private var ui: ListState
+    let manager: DownloadManager
+    let ui: ListState
     let record: DownloadRecord
+    let missing: Bool
 
     var body: some View {
         let r = record
         let a = RowActions(manager: manager, ui: ui)
-        let missing = manager.missing.contains(r.id)
         if r.canPause {
             Button("Pause") { manager.pause(r.id) }
         } else if r.canResume {

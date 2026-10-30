@@ -43,9 +43,6 @@ public final class DownloadManager: ObservableObject {
         }
         items = loaded
         refreshMissing()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tick() }
-        }
         schedule()
     }
 
@@ -85,7 +82,7 @@ public final class DownloadManager: ObservableObject {
             mutate(id) { if $0.status == .queued || $0.status == .failed { $0.status = .paused } }
         }
         meters[id] = nil
-        speeds[id] = nil
+        if speeds[id] != nil { speeds[id] = nil }
         markDirty(force: true)
         schedule()
     }
@@ -111,7 +108,7 @@ public final class DownloadManager: ObservableObject {
             mutate(id) { $0.status = .cancelled }
         }
         meters[id] = nil
-        speeds[id] = nil
+        if speeds[id] != nil { speeds[id] = nil }
         markDirty(force: true)
         schedule()
     }
@@ -120,7 +117,7 @@ public final class DownloadManager: ObservableObject {
     public func remove(_ id: UUID) {
         if let r = items.first(where: { $0.id == id }), r.status != .completed { cancel(id) }
         items.removeAll { $0.id == id }
-        missing.remove(id)
+        if missing.contains(id) { missing.remove(id) }
         markDirty(force: true)
     }
 
@@ -209,36 +206,58 @@ public final class DownloadManager: ObservableObject {
             e.start()
             slots -= 1
         }
+        startTicking()
     }
 
+    /// The progress timer runs only while a transfer is running; an idle app does no periodic work.
+    private func startTicking() {
+        guard timer == nil, !engines.isEmpty else { return }
+        let t = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick() }
+        }
+        t.tolerance = 0.1
+        RunLoop.main.add(t, forMode: .default)
+        timer = t
+    }
+
+    private func stopTicking() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    /// Publishes only values that changed, so an unchanged tick redraws nothing.
     private func tick() {
         var total: Double = 0
         var finished: [UUID] = []
         var conns: [UUID: Int] = [:]
+        var newSpeeds: [UUID: Double] = [:]
         for (id, e) in engines {
             conns[id] = e.activeConnections
             let r = e.snapshot()
             update(r)
             meters[id, default: SpeedMeter()].add(bytes: r.downloadedBytes)
-            let s = meters[id]?.speed ?? 0
-            speeds[id] = s
-            total += s
             if !r.status.isActive && r.status != .queued {
                 finished.append(id)
+                continue
             }
+            let s = meters[id]?.speed ?? 0
+            newSpeeds[id] = s
+            total += s
         }
         for id in finished {
             engines[id] = nil
             meters[id] = nil
-            speeds[id] = nil
+            conns[id] = nil
             markDirty(force: true)
         }
-        totalSpeed = total
+        if newSpeeds != speeds { speeds = newSpeeds }
+        if total != totalSpeed { totalSpeed = total }
         if conns != activeConnections { activeConnections = conns }
         if !finished.isEmpty { refreshMissing() }
         if !engines.isEmpty { listDirty = true }
         if !finished.isEmpty { schedule() }
         if listDirty && Date().timeIntervalSince(lastListSave) > 3 { saveList() }
+        if engines.isEmpty { stopTicking() }
     }
 
     private func update(_ r: DownloadRecord) {
@@ -265,9 +284,15 @@ public final class DownloadManager: ObservableObject {
 }
 
 public enum Persistence {
+    /// `MACDOWNLOADER_SUPPORT_DIR` points a test run at its own list, settings and token.
     public static var supportDirectory: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let dir = base.appendingPathComponent("MacDownloader", isDirectory: true)
+        let dir: URL
+        if let custom = ProcessInfo.processInfo.environment["MACDOWNLOADER_SUPPORT_DIR"], !custom.isEmpty {
+            dir = URL(fileURLWithPath: custom, isDirectory: true)
+        } else {
+            let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            dir = base.appendingPathComponent("MacDownloader", isDirectory: true)
+        }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }

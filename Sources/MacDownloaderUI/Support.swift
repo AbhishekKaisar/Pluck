@@ -44,18 +44,25 @@ public enum Format {
     }
 }
 
-/// File icons from the system, cached by extension. A finished file on disk gets its own icon.
+/// File icons from the system, cached by extension. A finished file on disk gets its own icon,
+/// cached by path. Rendering never touches the disk: `missing` (refreshed on launch, focus and
+/// completion) says whether the file is there, and the disk is checked only on a cache miss.
 @MainActor
 enum FileIcons {
     private static var cache: [String: NSImage] = [:]
 
     static func icon(for r: DownloadRecord, missing: Bool) -> NSImage {
-        if r.status == .completed, !missing, FileManager.default.fileExists(atPath: r.finalPath) {
-            let key = "file:" + r.finalPath
-            if let i = cache[key] { return i }
-            let i = NSWorkspace.shared.icon(forFile: r.finalPath)
-            cache[key] = i
-            return i
+        let fileKey = "file:" + r.finalPath
+        if r.status == .completed, !missing {
+            if let i = cache[fileKey] { return i }
+            if FileManager.default.fileExists(atPath: r.finalPath) {
+                let i = NSWorkspace.shared.icon(forFile: r.finalPath)
+                cache[fileKey] = i
+                return i
+            }
+        } else if missing, cache[fileKey] != nil {
+            // The file went away; a file that comes back gets a fresh icon.
+            cache[fileKey] = nil
         }
         let ext = (r.fileName as NSString).pathExtension.lowercased()
         if let i = cache[ext] { return i }
