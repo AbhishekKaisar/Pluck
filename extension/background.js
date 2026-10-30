@@ -102,8 +102,11 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
   const timer = setTimeout(answer, 5000);
   tryCatch(item)
     .catch(() => false)
-    .finally(() => {
+    .then((caught) => {
       clearTimeout(timer);
+      // A caught download is already cancelled and erased; suggesting a name for it raises
+      // "Invalid downloadId".
+      if (caught) answered = true;
       answer();
     });
   return true;
