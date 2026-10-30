@@ -201,8 +201,25 @@ import Testing
         #expect(add.fileSize == 5)
     }
 
+    @Test func pingNamesPluck() {
+        guard case .respond(let r) = APIRouter.route(req("GET", "/ping"), token: token),
+              let obj = try? JSONSerialization.jsonObject(with: r.body) as? [String: Any] else {
+            Issue.record("expected a response"); return
+        }
+        #expect(obj["app"] as? String == "Pluck")
+    }
+
+    @Test func everyTokenHeaderIsAccepted() {
+        let body = #"{"url":"https://example.com/a.zip"}"#
+        for headers in [["x-pluck-token": token], ["x-macdownloader-token": token], ["authorization": "Bearer \(token)"]] {
+            guard case .run = APIRouter.route(req("POST", "/add", headers: headers, body: body), token: token) else {
+                Issue.record("rejected \(headers.keys.first!)"); return
+            }
+        }
+    }
+
     @Test func webOriginRejected() {
-        guard case .respond(let r) = APIRouter.route(req("POST", "/add", headers: ["origin": "https://evil.example", "x-macdownloader-token": token]), token: token) else {
+        guard case .respond(let r) = APIRouter.route(req("POST", "/add", headers: ["origin": "https://evil.example", "x-pluck-token": token]), token: token) else {
             Issue.record("expected 403"); return
         }
         #expect(r.status == 403)

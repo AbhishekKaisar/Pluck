@@ -1,9 +1,9 @@
-// Renders the real MacDownloader views with sample data into PNGs, offscreen.
+// Renders the real Pluck views with sample data into PNGs, offscreen.
 // Usage: snapshot [output directory]   (default build/snapshots)
 import AppKit
 import SwiftUI
 import DownloaderCore
-import MacDownloaderUI
+import PluckUI
 
 let outDir = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "build/snapshots"
 let fm = FileManager.default

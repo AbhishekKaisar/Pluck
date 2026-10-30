@@ -5,15 +5,15 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en-GB</string>
 	<key>CFBundleExecutable</key>
-	<string>MacDownloader</string>
+	<string>Pluck</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.shadman.macdownloader</string>
+	<string>io.github.abhishekkaisar.pluck</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>MacDownloader</string>
+	<string>Pluck</string>
 	<key>CFBundleDisplayName</key>
-	<string>MacDownloader</string>
+	<string>Pluck</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -30,15 +30,18 @@
 	<string>public.app-category.utilities</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 Abhishek Kaisar. MIT licence.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.shadman.macdownloader</string>
+			<string>io.github.abhishekkaisar.pluck</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>pluck</string>
 				<string>macdownloader</string>
 			</array>
 		</dict>

@@ -37,9 +37,19 @@ public final class ListState: ObservableObject {
     public init(persists: Bool = true) {
         self.persists = persists
         let d = UserDefaults.standard
+        if persists { Self.carryOverLegacyDefaults(into: d) }
         sort = persists ? (d.string(forKey: "list.sort").flatMap(ListSort.init(rawValue:)) ?? .newest) : .newest
         filter = persists ? (d.string(forKey: "list.filter").flatMap(ListFilter.init(rawValue:)) ?? .all) : .all
         showDetails = persists ? (d.object(forKey: "list.showDetails") as? Bool ?? true) : true
+    }
+
+    static let defaultsKeys = ["list.sort", "list.filter", "list.showDetails"]
+
+    /// The sort, filter and detail-panel choice lived under the old bundle id before the rename.
+    private static func carryOverLegacyDefaults(into d: UserDefaults) {
+        guard defaultsKeys.allSatisfy({ d.object(forKey: $0) == nil }),
+              let old = UserDefaults(suiteName: "com.shadman.macdownloader") else { return }
+        for key in defaultsKeys { if let v = old.object(forKey: key) { d.set(v, forKey: key) } }
     }
 
     private func save(_ value: Any, _ key: String) {

@@ -19,7 +19,7 @@ public struct RequestHeaders: Codable, Equatable, Sendable {
         self.userAgent = userAgent
     }
 
-    public static let defaultUserAgent = "MacDownloader/\(AppInfo.version)"
+    public static let defaultUserAgent = "Pluck/\(AppInfo.version)"
 
     public func apply(to request: inout URLRequest) {
         request.setValue(userAgent?.nilIfBlank ?? Self.defaultUserAgent, forHTTPHeaderField: "User-Agent")
@@ -134,7 +134,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
 public enum AppInfo {
     public static let version = "1.0.0"
-    public static let bundleID = "com.shadman.macdownloader"
+    public static let bundleID = "io.github.abhishekkaisar.pluck"
 }
 
 extension String {

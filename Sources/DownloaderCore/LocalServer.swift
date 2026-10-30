@@ -35,7 +35,7 @@ public final class LocalServer: @unchecked Sendable {
     public static let portRange: ClosedRange<UInt16> = 6801...6820
     static let maxRequestBytes = 1 << 20
 
-    private let queue = DispatchQueue(label: "macdownloader.server")
+    private let queue = DispatchQueue(label: "pluck.server")
     private let handler: Handler
     private var listener: NWListener?
     public private(set) var port: UInt16?
@@ -193,7 +193,7 @@ public enum APIRouter {
             return .respond(HTTPResponse(status: 403, json: ["error": "origin not allowed"]))
         }
         if req.path == "/ping" {
-            return .respond(HTTPResponse(status: 200, json: ["app": "MacDownloader", "version": AppInfo.version]))
+            return .respond(HTTPResponse(status: 200, json: ["app": "Pluck", "version": AppInfo.version]))
         }
         guard authorised(req, token: token) else {
             return .respond(HTTPResponse(status: 401, json: ["error": "missing or wrong token"]))
@@ -221,7 +221,8 @@ public enum APIRouter {
     }
 
     static func authorised(_ req: HTTPRequest, token: String) -> Bool {
-        var supplied = req.headers["x-macdownloader-token"] ?? ""
+        // X-MacDownloader-Token is the header from before the rename; it stays accepted.
+        var supplied = req.headers["x-pluck-token"] ?? req.headers["x-macdownloader-token"] ?? ""
         if supplied.isEmpty, let auth = req.headers["authorization"], auth.lowercased().hasPrefix("bearer ") {
             supplied = String(auth.dropFirst(7)).trimmingCharacters(in: .whitespaces)
         }

@@ -284,17 +284,49 @@ public final class DownloadManager: ObservableObject {
 }
 
 public enum Persistence {
-    /// `MACDOWNLOADER_SUPPORT_DIR` points a test run at its own list, settings and token.
+    /// `PLUCK_SUPPORT_DIR` (or the older `MACDOWNLOADER_SUPPORT_DIR`) points a test run at its own
+    /// list, settings and token. Without it the folder is `~/Library/Application Support/Pluck`.
     public static var supportDirectory: URL {
+        let env = ProcessInfo.processInfo.environment
         let dir: URL
-        if let custom = ProcessInfo.processInfo.environment["MACDOWNLOADER_SUPPORT_DIR"], !custom.isEmpty {
+        if let custom = [env["PLUCK_SUPPORT_DIR"], env["MACDOWNLOADER_SUPPORT_DIR"]].compactMap({ $0 }).first(where: { !$0.isEmpty }) {
             dir = URL(fileURLWithPath: custom, isDirectory: true)
         } else {
             let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            dir = base.appendingPathComponent("MacDownloader", isDirectory: true)
+            dir = base.appendingPathComponent(folderName, isDirectory: true)
+            migrateLegacyFolder(in: base)
         }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
+    }
+
+    public static let folderName = "Pluck"
+    /// The folder name the app used before it was called Pluck.
+    public static let legacyFolderName = "MacDownloader"
+
+    public enum Migration: Equatable, Sendable {
+        case copied, alreadyMigrated, nothingToMigrate, failed
+    }
+
+    /// Copies `<base>/MacDownloader` to `<base>/Pluck` once, so settings, token and list carry over
+    /// the rename. The old folder is left in place. Copies into a temporary name first and renames
+    /// it, so a crash halfway never leaves a half-filled Pluck folder that would block a retry.
+    @discardableResult
+    public static func migrateLegacyFolder(in base: URL, fileManager fm: FileManager = .default) -> Migration {
+        let target = base.appendingPathComponent(folderName, isDirectory: true)
+        let legacy = base.appendingPathComponent(legacyFolderName, isDirectory: true)
+        if fm.fileExists(atPath: target.path) { return .alreadyMigrated }
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: legacy.path, isDirectory: &isDir), isDir.boolValue else { return .nothingToMigrate }
+        let staging = base.appendingPathComponent(".\(folderName)-migrating-\(UUID().uuidString)", isDirectory: true)
+        do {
+            try fm.copyItem(at: legacy, to: staging)
+            try fm.moveItem(at: staging, to: target)
+            return .copied
+        } catch {
+            try? fm.removeItem(at: staging)
+            return fm.fileExists(atPath: target.path) ? .alreadyMigrated : .failed
+        }
     }
 
     public static var downloadsURL: URL { supportDirectory.appendingPathComponent("downloads.json") }

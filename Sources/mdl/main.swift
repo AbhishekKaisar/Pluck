@@ -1,7 +1,7 @@
 import Foundation
 import DownloaderCore
 
-// mdl: command-line front end to the MacDownloader engine.
+// mdl: command-line front end to the Pluck engine.
 // usage: mdl [-c connections] [-o directory] [-n filename] [-l KiB/s] URL
 // Ctrl-C pauses and saves resume state; run the same command again to resume.
 

@@ -1,96 +1,163 @@
-# MacDownloader
+<p align="center">
+  <img src="docs/images/icon.png" width="128" height="128" alt="Pluck icon">
+</p>
 
-A small, native download manager for macOS in the spirit of IDM. It catches downloads from Chrome and Edge and fetches each file over several connections at once, which is usually much faster than the browser's single stream, especially on long, lossy routes.
+<h1 align="center">Pluck</h1>
 
-No Electron, no third-party dependencies: Swift, SwiftUI, AppKit, `URLSession` and `Network.framework`, plus a plain Manifest V3 extension.
+<p align="center">A fast, tiny download manager for the Mac. It splits each file across many connections, so big downloads finish in a fraction of the time.</p>
 
-## What it does
+<p align="center">
+  <a href="https://github.com/AbhishekKaisar/Pluck/releases/latest"><img src="https://img.shields.io/github/v/release/AbhishekKaisar/Pluck?label=download&color=2ea043" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-14%20Sonoma%20or%20later-blue" alt="macOS 14 or later">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/AbhishekKaisar/Pluck?color=blue" alt="MIT licence"></a>
+</p>
 
-- **Segmented downloads.** A `Range: bytes=0-0` probe finds the size, range support and filename (from `Content-Disposition`, else the final URL after redirects). The file is split into N segments (default 16, 1 to 32), each on its own connection, written into one preallocated `.part` file at the right offsets.
-- **Dynamic splitting.** When a segment finishes, the largest remaining one is cut in half and handed to the free connection, so every connection stays busy to the end. A watchdog replaces stalled connections and, near the end, connections that have slowed to a crawl.
-- **Fallback.** Servers without range support, or with an unknown size, get a single stream.
-- **Pause, resume, cancel, retry.** Per-segment progress is saved in `<name>.part.json` beside the `.part` file, so resume survives quitting the app or a crash. Segment errors retry with backoff (1, 2, 4, 8, 16, 30 s). On completion the `.part` file is renamed; existing files are never overwritten (`name (1).ext`).
-- **Logged-in downloads.** Cookies, referrer and user agent from the browser are sent on every request.
-- **Queue and limits.** Up to 3 downloads at once by default, the rest wait in a queue. Optional global speed limit.
-- **Live speed and ETA** per item over a 4 second sliding window, total speed in the menu bar.
-- **Persistent list** in `~/Library/Application Support/MacDownloader/downloads.json`.
+<p align="center">
+  <img src="docs/images/hero-light.png" alt="Pluck's main window with a download in progress and its live connection map" width="900">
+</p>
 
-## The window
+## Why Pluck
 
-- One clean list: checkbox, real file-type icon, name, size, status (inline progress, percent, time left), speed, date added, and a ⋯ menu per row. Date and then speed hide as the window narrows.
-- Sort (newest, oldest, name, size, status), filter (active, completed, missing files, file type) and search work together; sort and filter are remembered.
-- Select rows with the checkboxes, Cmd-click or Shift-click; the toolbar turns into an action bar (Resume, Pause, Remove from list, Delete files).
-- Select one row to see its details: link (Copy), saved path (Reveal in Finder), connections in use and a live segment map of every part of the file.
-- Add download (Cmd+N) fills in links from the clipboard, takes many links at once, checks a single link for its name, size and resume support, and lets you pick the folder and connections, or add it paused with Download later.
-- Drag a link or a `.txt` of links anywhere onto the window. Cmd+V on the list, Space pauses or resumes, Delete removes, Cmd+Delete deletes files, Cmd+F searches, Cmd+, opens Settings.
-- Finished files deleted from disk show as "File missing" (checked on launch and whenever the window comes to the front).
-- The status bar has the speed-limit toggle (tortoise; the limit itself is in Settings), total speed, active count and Done count.
+- **Much faster on big files.** Pluck opens up to 32 connections to the same file at once, where a browser opens one. As each piece finishes, the largest remaining piece is split again, so every connection stays busy to the end.
+- **Catches your Chrome and Edge downloads.** Click a download link as usual and the browser extension hands it to Pluck, with your cookies, so downloads from sites you are logged in to work too.
+- **Pause and resume, even after a restart.** Quit the app, shut the lid or lose Wi-Fi: Pluck carries on from where it stopped.
+- **See what is happening.** A live map shows every connection and how much of the file each one has fetched.
+- **Light on your Mac.** A 1.2 MB download (2.4 MB installed) that runs natively on Apple silicon and Intel. It uses 0% CPU and about 19 MB of memory when idle.
+- **No ads, no tracking, no account.** Free and open source under the MIT licence.
 
-## Build
+## How much faster
 
-Needs the Swift command line tools (Swift 6). Xcode is not needed.
+Same file, same Mac, same 315 Mbps line. `curl` downloads over a single connection, as a browser does.
+
+| Download | Single connection (`curl`) | Pluck |
+| --- | --- | --- |
+| 100 MB file from a distant server | 493 s | 48 s with 8 connections, about 15 s with 32 |
+| 140 MB file from a nearby CDN | 31 s | 4.1 s with 16 connections |
+
+Your results depend on the server and the route to it. The gain is largest when the server is far away or limits the speed of each connection. See [why some sites are not faster](#why-are-some-downloads-not-faster).
+
+<p align="center">
+  <img src="docs/images/list-dark.png" alt="Pluck's download list in dark mode" width="900">
+</p>
+
+## Install
+
+1. Download **Pluck-1.0.0.dmg** from the [latest release](https://github.com/AbhishekKaisar/Pluck/releases/latest).
+2. Open it and drag **Pluck** into **Applications**.
+3. Open Pluck. The first time, macOS says it cannot check the app for malicious software, because Pluck is not signed with a paid Apple developer certificate. To open it anyway, either:
+   - right-click (or Control-click) Pluck in Applications and choose **Open**, then **Open** again; or
+   - try to open it once, then go to **System Settings > Privacy & Security**, scroll down and click **Open Anyway**.
+
+   You only need to do this once. If you would rather check the code first, everything is here and you can [build it yourself](#build-from-source).
+
+Pluck runs on macOS 14 Sonoma or later, on both Apple silicon and Intel Macs.
+
+### Add the browser extension (Chrome or Edge)
+
+1. Download **Pluck-Extension-1.0.0.zip** from the same release and unzip it. Keep the folder somewhere it will stay, such as your Documents folder.
+2. Open `chrome://extensions` in Chrome or `edge://extensions` in Edge, and turn on **Developer mode**.
+3. Click **Load unpacked** and choose the **Pluck-Extension** folder.
+4. Pin the extension, then click its icon.
+5. In Pluck, open **Settings** (Cmd+,) and click **Copy** next to the token. Paste it into the extension and click **Save**. The dot turns green when the two are connected.
+
+From then on, downloads of common file types (archives, disk images, installers, video, audio, documents) of 1 MB or more go to Pluck. You can change the list and the minimum size in the extension. To send any link, right-click it and choose **Download with Pluck**.
+
+<p align="center">
+  <img src="docs/images/add-sheet.png" alt="The Add Download sheet showing a checked link with its size and resume support" width="520">
+</p>
+
+## Using Pluck
+
+- **Add a download** with Cmd+N. Pluck picks up a link you have copied, checks its name, size and whether it can resume, and lets you choose the folder and number of connections. Paste many links at once to add them all.
+- **Drag** a link, or a text file of links, onto the window.
+- **Select several** with the checkboxes, Cmd-click or Shift-click, then pause, resume, remove or delete them together.
+- **Sort, filter and search** the list. Pluck remembers your choice.
+- **Set a speed limit** in Settings and turn it on or off with the tortoise in the status bar.
+- The **menu bar** shows the total speed while something is downloading.
+
+<p align="center">
+  <img src="docs/images/multi-select.png" alt="Several downloads selected, with the action bar for pause, resume, remove and delete" width="900">
+</p>
+
+## FAQ
+
+### Is it safe? What leaves my Mac?
+
+Nothing except the downloads themselves. Pluck talks only to the servers you download from. It has no analytics, no crash reporting, no update check and no account. The browser extension talks only to Pluck on your own Mac (`127.0.0.1`), and only with the token from Pluck's Settings, so a web page cannot add downloads. Your list and settings stay in `~/Library/Application Support/Pluck`.
+
+The extension needs permission to read downloads and cookies for all sites. It uses them only to pass a download, with the cookies the browser would have sent for it, to Pluck on your Mac. You can read every line in [`extension/`](extension).
+
+### Why is there no Safari extension yet?
+
+A Safari extension has to be built and signed with Xcode and an Apple developer account. It is planned. Until then, you can paste links into Pluck (Cmd+N picks them up from the clipboard) or drag them onto the window.
+
+### Why are some downloads not faster?
+
+Pluck can only speed up a download when the server lets it fetch different parts of the file at the same time. Some servers do not allow that, and some links expire after the first request; Pluck then downloads over one connection, as the browser would. If your line is already the slowest part of the route, more connections cannot make it faster either. The biggest gains come from servers far away or servers that limit each connection.
+
+### A site blocks me or fails with many connections
+
+A few servers limit how many connections one visitor may open. Lower the number of connections for that download in the Add sheet, or set a lower default in Settings. Downloads that need a form to be submitted, or a sign-in that the browser keeps outside cookies, cannot be repeated by Pluck; turn the extension off for those sites.
+
+### What happens if Pluck is not running when I click a download?
+
+The browser downloads the file as it normally would. The extension only cancels the browser's copy after Pluck has accepted the download, so nothing is ever lost.
+
+### Does it work with Firefox?
+
+Not yet. Chrome, Edge and other Chromium browsers that load Chrome extensions are supported.
+
+## Build from source
+
+You need the Swift command line tools (Swift 6, `xcode-select --install`). Xcode is not needed.
 
 ```sh
-cd ~/Documents/MacDownloader
-./build.sh          # release build, assembles and ad-hoc signs build/MacDownloader.app, plus build/mdl
-./test.sh           # unit tests (swift-testing)
-swift build --build-system native --product snapshot && "$(swift build --build-system native --show-bin-path)/snapshot"
-                    # renders the real views with sample data into build/snapshots/*.png, light and dark
-open build/MacDownloader.app
+git clone https://github.com/AbhishekKaisar/Pluck.git
+cd Pluck
+./build.sh     # universal release build: build/Pluck.app and build/mdl, ad-hoc signed
+./test.sh      # unit tests
+open build/Pluck.app
 ```
 
-To install, drag `build/MacDownloader.app` into `/Applications` (or `cp -R build/MacDownloader.app /Applications/`). Because it is ad-hoc signed, the first launch from Finder may need right-click, Open.
+`ARCHS=arm64 ./build.sh` builds for Apple silicon only, which is quicker. `scripts/release.sh` packs the built app into the DMG and zips in `build/release`.
 
-To try a build without touching your own list, point it at a scratch folder: `MACDOWNLOADER_SUPPORT_DIR=/tmp/md-test build/MacDownloader.app/Contents/MacOS/MacDownloader`. It takes the next free port if the installed app holds 6801.
+To try a build without touching your own list and settings, point it at a scratch folder: `PLUCK_SUPPORT_DIR=/tmp/pluck-test build/Pluck.app/Contents/MacOS/Pluck`. It takes the next free port if another copy holds 6801.
 
-The app does no periodic work when nothing is downloading: the progress timer (2 Hz) runs only while a transfer is active, and only values that changed are published.
+### For developers
 
-`build.sh` passes `--build-system native` because the default SwiftPM build system fails on this machine without Xcode. `test.sh` adds the framework paths that swift-testing needs with the command line tools only.
-
-## Install the browser extension (Chrome or Edge)
-
-1. Open `chrome://extensions` (Chrome) or `edge://extensions` (Edge).
-2. Turn on **Developer mode**.
-3. Click **Load unpacked** and choose `~/Documents/MacDownloader/extension`.
-4. Pin the extension, click its icon and paste the token: in MacDownloader, open **Settings** (Cmd+, or the ☰ menu) and click **Copy** next to the token. Click **Save**.
-5. The dot in the popup turns green when the app is reachable.
-
-From then on, a download that matches the file-type list and is at least the minimum size (1 MB by default) is handed to MacDownloader and removed from the browser's download list. If the app is not running, the token is wrong or the hand-over fails for any reason, the browser download carries on untouched, so nothing is lost. `blob:` and `data:` downloads and incognito windows are always left to the browser. Right-click a link and choose **Download with MacDownloader** to send any link.
-
-Safari is not supported: a Safari extension has to be built and signed with Xcode.
-
-## Other ways in
-
-- Add download (Cmd+N), Cmd+V on the list, drag and drop, or ☰ > Import links from file.
-- URL scheme: `open "macdownloader://add?url=https%3A%2F%2Fexample.com%2Ffile.zip"` (optional `filename` and `referrer`).
-- Local API on `127.0.0.1:6801` (the next free port up to 6820 if taken; the chosen port is in `server.json`):
-  - `GET /ping`: no token, returns the app name and version.
-  - `POST /add` with `{"url", "filename"?, "referrer"?, "cookies"?, "userAgent"?, "fileSize"?}` and header `X-MacDownloader-Token: <token>` (or `Authorization: Bearer <token>`).
-  - `GET /list`, `POST /control` with `{"id", "action": "pause" | "resume" | "cancel" | "remove"}` (remove keeps a finished file on disk), both with the token.
-  - Requests without the token get 401. Requests carrying a web page `Origin` get 403. Only loopback connections are accepted.
-- Command line: `build/mdl [-c connections] [-o directory] [-n filename] [-l KiB/s] URL`. Ctrl-C pauses and saves state; the same command again resumes.
-
-## Files
+- **Engine.** A `Range: bytes=0-0` probe finds the size, range support and file name. The file is split into segments, each on its own connection, written into one preallocated `.part` file. Progress per segment is saved in `<name>.part.json`, so resume survives a crash. Failed segments retry with backoff; a watchdog replaces stalled connections. Finished files never overwrite an existing one (`name (1).ext`).
+- **Speed limit.** Each connection fetches small ranges paced by a shared token bucket, so the network itself stays under the limit.
+- **URL scheme.** `open "pluck://add?url=https%3A%2F%2Fexample.com%2Ffile.zip"` (optional `filename` and `referrer`).
+- **Local API** on `127.0.0.1:6801`, or the next free port up to 6820 (the chosen port is in `server.json`):
+  - `GET /ping` needs no token and returns the app name and version.
+  - `POST /add` with `{"url", "filename"?, "referrer"?, "cookies"?, "userAgent"?, "fileSize"?}` and the header `Authorization: Bearer <token>` (or `X-Pluck-Token: <token>`).
+  - `GET /list`, and `POST /control` with `{"id", "action": "pause" | "resume" | "cancel" | "remove"}`, both with the token.
+  - Requests without the token get 401, requests with a web page `Origin` get 403, and only loopback connections are accepted.
+- **Command line.** `build/mdl [-c connections] [-o directory] [-n filename] [-l KiB/s] URL`. Ctrl-C pauses and saves; the same command again resumes.
+- **Snapshots.** `swift build --build-system native --product snapshot && "$(swift build --build-system native --show-bin-path)/snapshot"` renders the real views with sample data into `build/snapshots`, light and dark.
 
 ```
-Package.swift
-build.sh, test.sh
-Resources/Info.plist, AppIcon.icns
 Sources/DownloaderCore/   engine, segment maths, file naming, manager, local server
-Sources/MacDownloaderUI/  SwiftUI views: window, table, detail panel, Add sheet, settings, menu bar extra
-Sources/MacDownloader/    app entry point, menus and keyboard commands
-Sources/snapshot/         offscreen renderer for the views (build/snapshots)
+Sources/PluckUI/          SwiftUI views: window, table, detail panel, Add sheet, settings, menu bar
+Sources/Pluck/            app entry point, menus and keyboard commands
 Sources/mdl/              command line front end to the engine
+Sources/snapshot/         offscreen renderer for the views
 Tests/DownloaderCoreTests/
 extension/                Manifest V3 extension for Chrome and Edge
-scripts/make-icons.swift  draws the icons
+scripts/                  icon drawing and release packing
 ```
 
-## Known limits
+Pluck was called MacDownloader during development. On first launch it copies `~/Library/Application Support/MacDownloader` to `~/Library/Application Support/Pluck`, and the old `macdownloader://` links and API header still work.
 
-- Safari is out of scope (needs Xcode).
-- Each connection uses its own `URLSession`, so it gets its own TCP connection; one shared session would multiplex everything over one HTTP/2 connection and lose the speed-up. Some servers cap or block clients that open many connections; lower the connection count for those.
-- Cookies are sent as a plain `Cookie` header and dropped when a redirect leads to an unrelated host, which can break the rare download that needs the same cookies on a different domain.
-- With a speed limit on, each connection fetches small ranges paced by a shared token bucket, so the network itself stays under the limit (measured 1.03 MB/s on the wire at a 1024 KiB/s limit). Servers without range support are not limited.
-- Downloads that need a POST body, or a page-bound token that the browser holds outside cookies, cannot be repeated by the app; turn the extension off for those sites or use the browser.
-- No browser integration for Firefox or Safari, no video grabbing from pages, no scheduler.
+## Privacy
+
+Pluck collects nothing. There is no telemetry, no analytics and no network traffic other than the downloads you ask for. The token that connects the extension is created on your Mac on first launch and stored only there, readable by your user account alone.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
+
+## Support Pluck
+
+<!-- donate link goes here -->
+A donation link is coming soon. Until then, a star on GitHub or telling a friend helps a lot.

@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "MacDownloader",
+  "name": "Pluck",
   "version": "1.0.0",
-  "description": "Hands browser downloads to the MacDownloader app for faster multi-connection downloading.",
+  "description": "Hands browser downloads to the Pluck app on your Mac for faster multi-connection downloading.",
   "minimum_chrome_version": "110",
+  "homepage_url": "https://github.com/AbhishekKaisar/Pluck",
   "permissions": [
     "downloads",
     "cookies",
@@ -18,7 +19,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "MacDownloader",
+    "default_title": "Pluck",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",

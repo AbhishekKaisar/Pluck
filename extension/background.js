@@ -1,4 +1,4 @@
-// MacDownloader service worker.
+// Pluck service worker.
 // Catches browser downloads and hands them to the app on 127.0.0.1. The rule that matters most:
 // the browser download is cancelled only after the app has accepted it, so nothing is ever lost.
 
@@ -12,7 +12,7 @@ import {
   fileNameFromURL,
 } from "./common.js";
 
-const MENU_ID = "macdownloader-link";
+const MENU_ID = "pluck-link";
 // URLs we hand back to the browser ourselves (context menu fallback); never catch them again.
 const bypass = new Set();
 
@@ -20,7 +20,7 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: MENU_ID,
-      title: "Download with MacDownloader",
+      title: "Download with Pluck",
       contexts: ["link", "video", "audio", "image"],
     });
   });

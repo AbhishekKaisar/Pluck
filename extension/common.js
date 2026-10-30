@@ -23,13 +23,13 @@ function base(port) {
   return `http://127.0.0.1:${port}`;
 }
 
-/** True when the MacDownloader app answers on this port. */
+/** True when the Pluck app answers on this port ("MacDownloader" is its name before the rename). */
 export async function ping(port, timeoutMs = 800) {
   try {
     const r = await fetch(`${base(port)}/ping`, { signal: AbortSignal.timeout(timeoutMs), cache: "no-store" });
     if (!r.ok) return false;
     const j = await r.json();
-    return j && j.app === "MacDownloader";
+    return !!j && (j.app === "Pluck" || j.app === "MacDownloader");
   } catch {
     return false;
   }
@@ -53,7 +53,8 @@ export async function sendToApp(port, token, payload) {
   try {
     const r = await fetch(`${base(port)}/add`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-MacDownloader-Token": token },
+      // Bearer works with every version of the app, before and after the rename.
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(3000),
     });

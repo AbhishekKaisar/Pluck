@@ -34,7 +34,7 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
         self.record = record
         self.connections = min(SegmentMath.maxConnections, max(1, connections))
         self.limiter = limiter
-        self.queue = DispatchQueue(label: "macdownloader.engine.\(record.id.uuidString)")
+        self.queue = DispatchQueue(label: "pluck.engine.\(record.id.uuidString)")
         let oq = OperationQueue()
         oq.maxConcurrentOperationCount = 1
         oq.underlyingQueue = queue

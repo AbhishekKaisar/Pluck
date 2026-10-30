@@ -388,12 +388,12 @@ struct TopBar: View {
             Button("Clear finished") { manager.clearFinished() }
             Divider()
             SettingsLink { Text("Settings…") }
-            Button("About MacDownloader") {
+            Button("About Pluck") {
                 NSApp.orderFrontStandardAboutPanel(nil)
                 NSApp.activate(ignoringOtherApps: true)
             }
             Divider()
-            Button("Quit MacDownloader") { NSApp.terminate(nil) }
+            Button("Quit Pluck") { NSApp.terminate(nil) }
         } label: {
             Image(systemName: "line.3.horizontal").font(.system(size: 14, weight: .medium))
         }

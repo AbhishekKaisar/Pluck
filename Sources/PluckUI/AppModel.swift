@@ -87,9 +87,9 @@ public final class AppModel: ObservableObject {
         }
     }
 
-    /// `macdownloader://add?url=...&filename=...&referrer=...`
+    /// `pluck://add?url=...&filename=...&referrer=...` (the old `macdownloader://` still works).
     public func handle(openURL url: URL) {
-        guard url.scheme?.lowercased() == "macdownloader",
+        guard let scheme = url.scheme?.lowercased(), scheme == "pluck" || scheme == "macdownloader",
               let comps = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
         let action = (comps.host ?? comps.path).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard action == "add" else { return }
@@ -120,7 +120,7 @@ public final class AppModel: ObservableObject {
     public func exportLinks() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.plainText]
-        panel.nameFieldStringValue = "MacDownloader links.txt"
+        panel.nameFieldStringValue = "Pluck links.txt"
         panel.prompt = "Export"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let text = manager.items.reversed().map(\.url.absoluteString).joined(separator: "\n") + "\n"

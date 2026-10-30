@@ -25,7 +25,7 @@ public struct MenuBarPanel: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("MacDownloader").font(.headline)
+                Text("Pluck").font(.headline)
                 Spacer()
                 Text(Format.speed(manager.totalSpeed)).monospacedDigit().foregroundStyle(.secondary)
             }
@@ -48,7 +48,7 @@ public struct MenuBarPanel: View {
             }
             Divider()
             HStack {
-                Button("Open MacDownloader") {
+                Button("Open Pluck") {
                     openWindow(id: "main")
                     NSApp.activate(ignoringOtherApps: true)
                 }

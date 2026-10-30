@@ -13,7 +13,7 @@ async function refreshStatus() {
     if (port !== Number($("port").value)) $("port").value = port;
   } else {
     dot.className = "dot off";
-    status.textContent = "App not running";
+    status.textContent = "Pluck is not running";
   }
   dot.title = status.textContent;
 }
