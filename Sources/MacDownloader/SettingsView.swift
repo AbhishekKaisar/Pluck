@@ -23,7 +23,7 @@ struct SettingsView: View {
                             Button("Choose…", action: chooseFolder)
                         }
                     }
-                    Stepper(value: $manager.settings.connections, in: 1...16) {
+                    Stepper(value: $manager.settings.connections, in: 1...SegmentMath.maxConnections) {
                         LabeledContent("Connections per download", value: "\(manager.settings.connections)")
                     }
                     Stepper(value: $manager.settings.maxConcurrent, in: 1...10) {

@@ -28,12 +28,15 @@ public enum SegmentMath {
     /// Smallest piece worth its own connection.
     public static let defaultMinSegment: Int64 = 512 * 1024
 
+    /// Most connections one download may open.
+    public static let maxConnections = 32
+
     /// Splits a file of `totalSize` bytes into up to `connections` contiguous segments.
     /// Returns a single open-ended segment when the size is unknown.
     public static func plan(totalSize: Int64?, connections: Int, minSegment: Int64 = defaultMinSegment) -> [Segment] {
         guard let size = totalSize, size > 0 else { return [Segment(start: 0, end: -1)] }
         let byMin = max(1, size / max(1, minSegment))
-        let count = Int64(max(1, min(connections, 16, Int(min(byMin, 16)))))
+        let count = Int64(max(1, min(connections, maxConnections, Int(min(byMin, Int64(maxConnections))))))
         let base = size / count
         var segments: [Segment] = []
         var start: Int64 = 0

@@ -6,7 +6,7 @@ No Electron, no third-party dependencies: Swift, SwiftUI, AppKit, `URLSession` a
 
 ## What it does
 
-- **Segmented downloads.** A `Range: bytes=0-0` probe finds the size, range support and filename (from `Content-Disposition`, else the final URL after redirects). The file is split into N segments (default 8, 1 to 16), each on its own connection, written into one preallocated `.part` file at the right offsets.
+- **Segmented downloads.** A `Range: bytes=0-0` probe finds the size, range support and filename (from `Content-Disposition`, else the final URL after redirects). The file is split into N segments (default 16, 1 to 32), each on its own connection, written into one preallocated `.part` file at the right offsets.
 - **Dynamic splitting.** When a segment finishes, the largest remaining one is cut in half and handed to the free connection, so every connection stays busy to the end. A watchdog replaces stalled connections and, near the end, connections that have slowed to a crawl.
 - **Fallback.** Servers without range support, or with an unknown size, get a single stream.
 - **Pause, resume, cancel, retry.** Per-segment progress is saved in `<name>.part.json` beside the `.part` file, so resume survives quitting the app or a crash. Segment errors retry with backoff (1, 2, 4, 8, 16, 30 s). On completion the `.part` file is renamed; existing files are never overwritten (`name (1).ext`).

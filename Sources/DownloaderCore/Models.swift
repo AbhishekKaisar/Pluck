@@ -88,7 +88,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var speedLimitKiB: Int
 
     public init(downloadDirectory: String = (NSHomeDirectory() as NSString).appendingPathComponent("Downloads"),
-                connections: Int = 8, maxConcurrent: Int = 3, speedLimitKiB: Int = 0) {
+                connections: Int = 16, maxConcurrent: Int = 3, speedLimitKiB: Int = 0) {
         self.downloadDirectory = downloadDirectory
         self.connections = connections
         self.maxConcurrent = maxConcurrent
@@ -97,7 +97,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
 
     public var clamped: AppSettings {
         var s = self
-        s.connections = min(16, max(1, connections))
+        s.connections = min(SegmentMath.maxConnections, max(1, connections))
         s.maxConcurrent = min(10, max(1, maxConcurrent))
         s.speedLimitKiB = max(0, speedLimitKiB)
         return s

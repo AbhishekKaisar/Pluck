@@ -32,7 +32,7 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
     public init(record: DownloadRecord, connections: Int, limiter: SpeedLimiter = .shared) {
         self.id = record.id
         self.record = record
-        self.connections = min(16, max(1, connections))
+        self.connections = min(SegmentMath.maxConnections, max(1, connections))
         self.limiter = limiter
         self.queue = DispatchQueue(label: "macdownloader.engine.\(record.id.uuidString)")
         let oq = OperationQueue()
@@ -50,7 +50,7 @@ public final class DownloadEngine: NSObject, @unchecked Sendable {
 
     public func start(connections: Int? = nil) {
         queue.async {
-            if let c = connections { self.connections = min(16, max(1, c)) }
+            if let c = connections { self.connections = min(SegmentMath.maxConnections, max(1, c)) }
             self.startLocked()
         }
     }

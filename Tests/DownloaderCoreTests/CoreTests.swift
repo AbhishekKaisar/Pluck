@@ -27,7 +27,7 @@ import Testing
     }
 
     @Test func connectionsCappedAtSixteen() {
-        #expect(SegmentMath.plan(totalSize: 1 << 32, connections: 40).count == 16)
+        #expect(SegmentMath.plan(totalSize: 1 << 32, connections: 40).count == 32)
         #expect(SegmentMath.plan(totalSize: 1 << 32, connections: 0).count == 1)
     }
 
