@@ -1,6 +1,7 @@
 // Pluck service worker.
 // Catches browser downloads and hands them to the app on 127.0.0.1. The rule that matters most:
 // the browser download is cancelled only after the app has accepted it, so nothing is ever lost.
+// "Accepted" can mean queued for the user's answer; the app keeps those if it quits before one comes.
 
 import {
   getSettings,

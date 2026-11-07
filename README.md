@@ -71,7 +71,7 @@ From then on, downloads of common file types (archives, disk images, installers,
 ## Using Pluck
 
 - **Add a download** with Cmd+N. Pluck picks up a link you have copied, checks its name, size and whether it can resume, and lets you choose the folder and number of connections. Paste many links at once to add them all.
-- **Choose where each download goes.** Turn on "Ask where to save each download" in Settings and the Add sheet opens for every browser download, with the default folder filled in. Click Download to accept it or Change… to pick another folder. Nothing starts until you answer, and downloads that arrive meanwhile wait their turn. Quitting Pluck drops the ones still waiting.
+- **Choose where each download goes.** Turn on "Ask where to save each download" in Settings and the Add sheet opens for every browser download, with the default folder filled in. Click Download to accept it or Change… to pick another folder. Nothing starts until you answer, and downloads that arrive meanwhile wait their turn. If you quit first, the ones still waiting are kept in the list, paused. Cancel drops a download for good, because the browser's copy is already gone.
 - **Drag** a link, or a text file of links, onto the window.
 - **Select several** with the checkboxes, Cmd-click or Shift-click, then pause, resume, remove or delete them together.
 - **Sort, filter and search** the list. Pluck remembers your choice.
@@ -110,7 +110,7 @@ The link is a small script inside the app (`Pluck.app/Contents/Resources/pluck-h
 
 ### Where do my downloads go?
 
-Into the default folder in Settings (Downloads by default). To choose a folder each time, turn on "Ask where to save each download": browser downloads then open the Add sheet first. Downloads you add yourself with Cmd+N always show it, and `mdl` never asks.
+Into the default folder in Settings (Downloads by default). To choose a folder each time, turn on "Ask where to save each download": browser downloads then open the Add sheet first. Downloads you add yourself with Cmd+N always show it, `pluck://` links show it when the setting is on, and `mdl` never asks.
 
 ### Does it work with Firefox?
 
@@ -136,10 +136,10 @@ To try a build without touching your own list and settings, point it at a scratc
 
 - **Engine.** A `Range: bytes=0-0` probe finds the size, range support and file name. The file is split into segments, each on its own connection, written into one preallocated `.part` file. Progress per segment is saved in `<name>.part.json`, so resume survives a crash. Failed segments retry with backoff; a watchdog replaces stalled connections. Finished files never overwrite an existing one (`name (1).ext`).
 - **Speed limit.** Each connection fetches small ranges paced by a shared token bucket, so the network itself stays under the limit.
-- **URL scheme.** `open "pluck://add?url=https%3A%2F%2Fexample.com%2Ffile.zip"` (optional `filename` and `referrer`).
+- **URL scheme.** `open "pluck://add?url=https%3A%2F%2Fexample.com%2Ffile.zip"` (optional `filename` and `referrer`). With "Ask where to save each download" on, it opens the Add sheet and waits for an answer.
 - **Local API** on `127.0.0.1:6801`, or the next free port up to 6820 (the chosen port is in `server.json`):
   - `GET /ping` needs no token and returns the app name and version.
-  - `POST /add` with `{"url", "filename"?, "referrer"?, "cookies"?, "userAgent"?, "fileSize"?}` and the header `Authorization: Bearer <token>` (or `X-Pluck-Token: <token>`).
+  - `POST /add` with `{"url", "filename"?, "referrer"?, "cookies"?, "userAgent"?, "fileSize"?, "ask"?}` and the header `Authorization: Bearer <token>` (or `X-Pluck-Token: <token>`). The reply is `{"ok": true, "id"}`. With `"ask": true` and the setting on, nothing is added yet: the Add sheet is queued and the reply is `{"ok": true, "asking": true}`, with no `id`.
   - `GET /list`, and `POST /control` with `{"id", "action": "pause" | "resume" | "cancel" | "remove"}`, both with the token.
   - Requests without the token get 401, requests with a web page `Origin` get 403, and only loopback connections are accepted.
 - **Command line.** `build/mdl [-c connections] [-o directory] [-n filename] [-l KiB/s] URL`. Ctrl-C pauses and saves; the same command again resumes.
