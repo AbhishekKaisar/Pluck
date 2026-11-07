@@ -143,13 +143,13 @@ MainActor.assumeIsolated {
                             fromClipboard: false, settings: settings, probe: .idle)
         render(AddDownloadSheet(draft: many), model: m, size: CGSize(width: 520, height: 290), dark: dark, name: "add-sheet-many")
         // A browser download waiting for an answer, then the same with a second one behind it.
-        let browser = AddDraft(text: "https://downloads.example.com/reports/annual-2025.pdf", fromClipboard: false,
+        let browser = AddDraft(caught: URL(string: "https://downloads.example.com/reports/annual-2025.pdf")!,
                                settings: settings, probe: .done(ProbeResult(fileName: "annual-2025.pdf", totalSize: 18 * MB, acceptsRanges: true)),
                                headers: RequestHeaders(cookies: "session=sample"), fileName: "Annual Report 2025.pdf", browserSize: 18 * MB)
         let single = model(items: items)
         single.ui.present(browser)
         render(AddDownloadSheet(draft: browser), model: single, size: CGSize(width: 520, height: 330), dark: dark, name: "add-sheet-browser")
-        let second = AddDraft(text: "https://cdn.example.edu/courses/cs451/lecture-08.mp4", fromClipboard: false, settings: settings, probe: .idle,
+        let second = AddDraft(caught: URL(string: "https://cdn.example.edu/courses/cs451/lecture-08.mp4")!, settings: settings, probe: .idle,
                               fileName: "lecture-08.mp4", browserSize: 1_180 * MB)
         let waiting = model(items: items)
         waiting.ui.present(browser)

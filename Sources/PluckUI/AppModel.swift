@@ -109,8 +109,7 @@ public final class AppModel: ObservableObject {
     /// Queues the Add sheet for a download from outside the app when the user asked to choose each folder.
     private func ask(url: URL, fileName: String?, headers: RequestHeaders, size: Int64?) -> Bool {
         guard manager.settings.askWhereToSave else { return false }
-        ui.present(AddDraft(text: url.absoluteString, fromClipboard: false, settings: manager.settings,
-                            headers: headers, fileName: fileName, browserSize: size))
+        ui.present(AddDraft(caught: url, settings: manager.settings, headers: headers, fileName: fileName, browserSize: size))
         return true
     }
 

@@ -62,7 +62,9 @@ public struct ContentView: View {
                     .allowsHitTesting(false)
             }
         }
-        .sheet(item: $ui.addDraft) { draft in
+        // Only the sheet's own buttons clear the draft. AppKit also dismisses it when the app quits, and
+        // that is not an answer: the draft must still be there to be kept.
+        .sheet(item: Binding(get: { ui.addDraft }, set: { if $0 != nil { ui.addDraft = $0 } })) { draft in
             AddDownloadSheet(draft: draft)
                 .environmentObject(manager)
                 .environmentObject(ui)

@@ -91,7 +91,11 @@ public struct AddDownloadSheet: View {
         }
         .padding(20)
         .frame(width: 520)
-        .onAppear { if draft.text.isEmpty { linksFocused = true } }
+        .onAppear {
+            draft.begin(settings: manager.settings)
+            if draft.text.isEmpty { linksFocused = true }
+        }
+        .background(QuitsWithSheetOpen())
     }
 
     @ViewBuilder private var fileCard: some View {
@@ -122,12 +126,12 @@ public struct AddDownloadSheet: View {
         case .probing:
             HStack(spacing: 6) {
                 ProgressView().controlSize(.mini)
-                Text(draft.browserSize.map { "\(Format.bytes($0)), checking the link…" } ?? "Checking the link…")
+                Text(draft.caughtSize.map { "\(Format.bytes($0)), checking the link…" } ?? "Checking the link…")
                     .foregroundStyle(.secondary)
             }
         case .done(let r):
             HStack(spacing: 10) {
-                Text(r.totalSize.map(Format.bytes) ?? "Size unknown").foregroundStyle(.secondary).monospacedDigit()
+                Text(draft.size.map(Format.bytes) ?? "Size unknown").foregroundStyle(.secondary).monospacedDigit()
                 if r.acceptsRanges {
                     Label("Resumable, splits across connections", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
@@ -138,7 +142,7 @@ public struct AddDownloadSheet: View {
             }
             .labelStyle(TightLabel())
         case .failed(let message):
-            if let size = draft.browserSize { Text(Format.bytes(size)).foregroundStyle(.secondary).monospacedDigit() }
+            if let size = draft.caughtSize { Text(Format.bytes(size)).foregroundStyle(.secondary).monospacedDigit() }
             Label(message, systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
                 .labelStyle(TightLabel())
@@ -165,6 +169,15 @@ public struct AddDownloadSheet: View {
         panel.directoryURL = URL(fileURLWithPath: draft.directory)
         panel.prompt = "Choose"
         if panel.runModal() == .OK, let url = panel.url { draft.directory = url.path }
+    }
+}
+
+/// A sheet refuses Quit and logout by default, without a word and before the app delegate hears of it.
+/// One can open on its own here, so it must not hold the app open.
+private struct QuitsWithSheetOpen: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { NSView() }
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async { view.window?.preventsApplicationTerminationWhenModal = false }
     }
 }
 

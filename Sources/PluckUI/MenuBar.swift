@@ -4,7 +4,7 @@ import DownloaderCore
 
 public struct MenuBarLabel: View {
     @ObservedObject var manager: DownloadManager
-    @ObservedObject var ui: ListState
+    let ui: ListState
     @Environment(\.openWindow) private var openWindow
 
     public init(manager: DownloadManager, ui: ListState) {
@@ -21,11 +21,14 @@ public struct MenuBarLabel: View {
                 Image(systemName: "arrow.down.circle")
             }
         }
-        .onChange(of: ui.addDraft?.id) { _, id in
-            guard id != nil else { return }
-            openWindow(id: "main")
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        .onReceive(ui.needsAttention) { bringForward() }
+        // A cold start from the browser can queue a draft before this view exists.
+        .onAppear { if ui.addDraft != nil { bringForward() } }
+    }
+
+    private func bringForward() {
+        openWindow(id: "main")
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 
