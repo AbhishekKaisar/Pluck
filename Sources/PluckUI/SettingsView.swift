@@ -14,13 +14,14 @@ public struct SettingsView: View {
     public var body: some View {
         Form {
             Section("Downloads") {
-                LabeledContent("Folder") {
+                LabeledContent("Default folder") {
                     HStack {
                         Text(manager.settings.downloadDirectory).lineLimit(1).truncationMode(.middle)
                             .foregroundStyle(.secondary)
                         Button("Choose…", action: chooseFolder)
                     }
                 }
+                Toggle("Ask where to save each download", isOn: $manager.settings.askWhereToSave)
                 Stepper(value: $manager.settings.connections, in: 1...SegmentMath.maxConnections) {
                     LabeledContent("Connections per download", value: "\(manager.settings.connections)")
                 }
