@@ -1,5 +1,6 @@
 #!/bin/sh
 # Chrome's native messaging host for Pluck. Chrome starts this when the extension finds no app;
 # it opens the app that contains it (without taking focus), answers once and exits.
-open -g "$(dirname "$0")/../.."
+# When the app cannot be opened it exits without answering, so the extension stops waiting at once.
+open -g "$(dirname "$0")/../.." || exit 1
 printf '\013\000\000\000{"ok":true}'

@@ -285,11 +285,16 @@ public final class DownloadManager: ObservableObject {
 
 public enum Persistence {
     /// `PLUCK_SUPPORT_DIR` (or the older `MACDOWNLOADER_SUPPORT_DIR`) points a test run at its own
-    /// list, settings and token. Without it the folder is `~/Library/Application Support/Pluck`.
-    public static var supportDirectory: URL {
+    /// list, settings and token.
+    public static var customSupportDirectory: String? {
         let env = ProcessInfo.processInfo.environment
+        return [env["PLUCK_SUPPORT_DIR"], env["MACDOWNLOADER_SUPPORT_DIR"]].compactMap({ $0 }).first(where: { !$0.isEmpty })
+    }
+
+    /// `customSupportDirectory`, or else `~/Library/Application Support/Pluck`.
+    public static var supportDirectory: URL {
         let dir: URL
-        if let custom = [env["PLUCK_SUPPORT_DIR"], env["MACDOWNLOADER_SUPPORT_DIR"]].compactMap({ $0 }).first(where: { !$0.isEmpty }) {
+        if let custom = customSupportDirectory {
             dir = URL(fileURLWithPath: custom, isDirectory: true)
         } else {
             let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
