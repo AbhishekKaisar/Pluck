@@ -5,7 +5,7 @@ Pluck is a fast, tiny download manager for the Mac. It splits each file across u
 ## Highlights
 
 - Up to 32 connections per download (16 by default), kept busy to the end by splitting the largest remaining piece.
-- Chrome and Edge extension that hands downloads to Pluck with your cookies, so logged-in downloads work. If Pluck is not running, the browser downloads as normal.
+- Chrome and Edge extension that hands downloads to Pluck with your cookies, so logged-in downloads work. If Pluck is closed, the extension starts it in the background.
 - Pause and resume that survive quitting, crashes and restarts.
 - Live connection map, sort, filter, search, multi-select, queue and speed limit.
 - 2.4 MB universal app for Apple silicon and Intel, 0% CPU when idle.
@@ -19,6 +19,8 @@ Pluck is a fast, tiny download manager for the Mac. It splits each file across u
 
 Requires macOS 14 Sonoma or later. `Pluck-{{VERSION}}.zip` holds the same app as the DMG.
 
-If you used Pluck under its development name, MacDownloader, your settings, token and list move across on first launch. Reload the extension once in `chrome://extensions` after installing.
+If you used Pluck under its development name, MacDownloader, your settings, token and list move across on first launch.
+
+The extension now has a fixed ID, so the browser treats it as new. If you already use it, remove it from `chrome://extensions`, load the new folder and paste the token again. Open Pluck once after updating so the browser can start it.
 
 ## Checksums (SHA-256)

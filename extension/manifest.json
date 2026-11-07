@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "Pluck",
   "version": "1.0.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo/1WJdyfqVy67Tgby0U1ylBn5tsG8CQ8lSiAno+hkvhh0nl9DIdPmpC8hnQaQziIMBfmAKVwKmo3qojuBIqOEUuqZ7zzvNW0zz34wRw3Vc0TpUKFb0v9G2LjAcX8QTnb6jWEB+n/tNnrT8rwVYtGOzsUf7L1lZvRhjYEE6z6v8nXXjJV72KhK9yOLeT0a4DT00UtCByKfL8g478oflxRGKicDvk/CiOuTM7u8Zh00MFgwsgDPVjS/TwhjTAoKJvvhiu4i88y7ePpBUNNz4mY7FFf+cuJuxyFA2RiMKpFvbf6j0ZpAmsdQbTjyZXQjCdPxUNSD9VTLTF4qLYSg+noxwIDAQAB",
   "description": "Hands browser downloads to the Pluck app on your Mac for faster multi-connection downloading.",
   "minimum_chrome_version": "110",
   "homepage_url": "https://github.com/AbhishekKaisar/Pluck",
@@ -9,7 +10,8 @@
     "downloads",
     "cookies",
     "contextMenus",
-    "storage"
+    "storage",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "<all_urls>"

@@ -48,6 +48,44 @@ export async function findApp(settings) {
   return null;
 }
 
+export const HOST_NAME = "io.github.abhishekkaisar.pluck";
+
+// A stalled port or a host stuck on a Gatekeeper prompt must not hold a download for longer. With
+// the 3 s of sendToApp this stays inside the 9 s limit in background.js.
+const START_LIMIT_MS = 5000;
+
+async function startApp(settings) {
+  const port = await findApp(settings);
+  if (port) return port;
+  try {
+    await chrome.runtime.sendNativeMessage(HOST_NAME, { action: "launch" });
+  } catch {
+    return null; // host not installed or app deleted: the browser downloads the file itself
+  }
+  const deadline = Date.now() + 4000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 200));
+    const p = await findApp(settings);
+    if (p) return p;
+  }
+  return null;
+}
+
+let starting = null;
+
+/** Like findApp, but starts the app through the native messaging host when it is closed. Downloads
+ *  that arrive together share one attempt. Returns null quickly when the host is not installed.
+ *  Never throws. */
+export function ensureApp(settings) {
+  if (!starting) {
+    const limit = new Promise((r) => setTimeout(r, START_LIMIT_MS, null));
+    starting = Promise.race([startApp(settings).catch(() => null), limit]).finally(() => {
+      starting = null;
+    });
+  }
+  return starting;
+}
+
 /** Posts a download to the app. Resolves to { ok, status }. Never throws. */
 export async function sendToApp(port, token, payload) {
   try {
