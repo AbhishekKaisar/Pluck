@@ -56,13 +56,17 @@ public final class AppModel: ObservableObject {
 
     public func stopServer() { server?.stop() }
 
-    private func run(_ command: APIRouter.Command) -> HTTPResponse {
+    func run(_ command: APIRouter.Command) -> HTTPResponse {
         switch command {
         case .add(let add):
             guard let url = URL(string: add.url) else { return HTTPResponse(status: 400, json: ["error": "bad url"]) }
-            let id = manager.add(url: url, fileName: add.filename,
-                                 headers: RequestHeaders(cookies: add.cookies, referrer: add.referrer, userAgent: add.userAgent),
-                                 expectedSize: add.fileSize)
+            let headers = RequestHeaders(cookies: add.cookies, referrer: add.referrer, userAgent: add.userAgent)
+            // The reply must not wait for the user: the extension cancels the browser's copy on it.
+            // No record exists yet, so there is no id; nothing reads it.
+            if add.ask == true, ask(url: url, fileName: add.filename, headers: headers, size: add.fileSize) {
+                return HTTPResponse(status: 200, json: ["ok": true, "asking": true])
+            }
+            let id = manager.add(url: url, fileName: add.filename, headers: headers, expectedSize: add.fileSize)
             return HTTPResponse(status: 200, json: ["ok": true, "id": id.uuidString])
         case .list:
             let list: [[String: Any]] = manager.items.map { r in
@@ -96,7 +100,18 @@ public final class AppModel: ObservableObject {
         let q = Dictionary((comps.queryItems ?? []).map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { a, _ in a })
         guard let s = q["url"], let target = URL(string: s), let scheme = target.scheme?.lowercased(),
               scheme == "http" || scheme == "https" else { return }
-        manager.add(url: target, fileName: q["filename"], headers: RequestHeaders(referrer: q["referrer"]))
+        let headers = RequestHeaders(referrer: q["referrer"])
+        if !ask(url: target, fileName: q["filename"], headers: headers, size: nil) {
+            manager.add(url: target, fileName: q["filename"], headers: headers)
+        }
+    }
+
+    /// Queues the Add sheet for a download from outside the app when the user asked to choose each folder.
+    private func ask(url: URL, fileName: String?, headers: RequestHeaders, size: Int64?) -> Bool {
+        guard manager.settings.askWhereToSave else { return false }
+        ui.present(AddDraft(text: url.absoluteString, fromClipboard: false, settings: manager.settings,
+                            headers: headers, fileName: fileName, browserSize: size))
+        return true
     }
 
     // MARK: Menu actions shared by the window and the app menu

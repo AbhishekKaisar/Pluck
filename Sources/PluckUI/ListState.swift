@@ -22,7 +22,12 @@ public final class ListState: ObservableObject {
     @Published public var showDetails: Bool { didSet { save(showDetails, "list.showDetails") } }
     @Published public var search = ""
     @Published public var selection: Set<UUID> = []
-    @Published public var addDraft: AddDraft?
+    /// The Add sheet that is open. Set it to nil to close it; the next waiting draft opens after it.
+    @Published public var addDraft: AddDraft? {
+        didSet { if addDraft == nil { openNextSoon() } }
+    }
+    /// Browser downloads waiting for the user's answer, oldest first.
+    @Published public private(set) var waitingDrafts: [AddDraft] = []
     @Published public var confirm: Confirm?
     @Published public var dropTargeted = false
     /// Bumped by Cmd+F; the search field takes focus when it changes.
@@ -101,7 +106,23 @@ public final class ListState: ObservableObject {
         if t == nil, let clip = Pasteboard.text, !LinkParser.links(in: clip).isEmpty {
             t = LinkParser.links(in: clip).map(\.absoluteString).joined(separator: "\n")
         }
+        guard addDraft == nil else { return }
         addDraft = AddDraft(text: t ?? "", fromClipboard: text == nil && t != nil, settings: settings)
+    }
+
+    /// The one way a draft reaches the screen: shown at once if no sheet is open, else it waits its turn.
+    public func present(_ draft: AddDraft) {
+        if addDraft == nil && waitingDrafts.isEmpty { addDraft = draft } else { waitingDrafts.append(draft) }
+    }
+
+    /// Waits for the closing sheet to finish leaving, or SwiftUI drops the new one.
+    private func openNextSoon() {
+        guard !waitingDrafts.isEmpty else { return }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard let self, self.addDraft == nil, !self.waitingDrafts.isEmpty else { return }
+            self.addDraft = self.waitingDrafts.removeFirst()
+        }
     }
 
     public func requestSearchFocus() { searchFocusRequest += 1 }
@@ -121,19 +142,32 @@ public final class AddDraft: ObservableObject, Identifiable {
     @Published public var connections: Int
     @Published public var probe: Probe = .idle
     public let fromClipboard: Bool
+    /// Cookies, referrer and user agent from the browser; sent only to the host they came from.
+    let headers: RequestHeaders
+    let headersHost: String?
+    /// The size the browser reported, used until or unless the probe knows better.
+    let browserSize: Int64?
     var nameEdited = false
     private var task: Task<Void, Never>?
     private let liveProbe: Bool
 
-    public init(text: String, fromClipboard: Bool, settings: AppSettings, probe: Probe? = nil) {
+    public init(text: String, fromClipboard: Bool, settings: AppSettings, probe: Probe? = nil,
+                headers: RequestHeaders = RequestHeaders(), fileName browserName: String? = nil, browserSize: Int64? = nil) {
         self.text = text
         self.fromClipboard = fromClipboard
+        self.headers = headers
+        self.headersHost = LinkParser.links(in: text).first?.host?.lowercased()
+        self.browserSize = (browserSize ?? 0) > 0 ? browserSize : nil
+        if let n = browserName?.trimmingCharacters(in: .whitespacesAndNewlines), !n.isEmpty {
+            fileName = FileNaming.sanitise(n)
+            nameEdited = true
+        }
         self.directory = settings.downloadDirectory
         self.connections = settings.connections
         self.liveProbe = probe == nil
         if let probe {
             self.probe = probe
-            if case .done(let r) = probe { fileName = r.fileName }
+            if case .done(let r) = probe, !nameEdited { fileName = r.fileName }
         } else {
             scheduleProbe(delay: 0)
         }
@@ -153,7 +187,7 @@ public final class AddDraft: ObservableObject, Identifiable {
         task = Task { [weak self] in
             if delay > 0 { try? await Task.sleep(nanoseconds: delay) }
             guard !Task.isCancelled else { return }
-            let result = await Prober.probe(url)
+            let result = await Prober.probe(url, headers: self?.headers(for: url) ?? RequestHeaders())
             guard !Task.isCancelled, let self else { return }
             switch result {
             case .success(let r):
@@ -163,6 +197,11 @@ public final class AddDraft: ObservableObject, Identifiable {
                 self.probe = .failed(f.message)
             }
         }
+    }
+
+    /// The browser's headers, only for the host they were captured for.
+    func headers(for url: URL) -> RequestHeaders {
+        url.host?.lowercased() == headersHost ? headers : RequestHeaders()
     }
 
     var probed: ProbeResult? {
@@ -180,7 +219,8 @@ public final class AddDraft: ObservableObject, Identifiable {
         for url in links {
             manager.add(url: url,
                         fileName: single && nameEdited && !name.isEmpty ? name : nil,
-                        expectedSize: single ? probed?.totalSize : nil,
+                        headers: headers(for: url),
+                        expectedSize: single ? (browserSize ?? probed?.totalSize) : nil,
                         directory: directory,
                         connections: connections == manager.settings.connections ? nil : connections,
                         startPaused: later)

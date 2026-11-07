@@ -31,7 +31,7 @@ struct PluckApp: App {
                 .environmentObject(model)
                 .environmentObject(model.manager)
         } label: {
-            MenuBarLabel(manager: model.manager)
+            MenuBarLabel(manager: model.manager, ui: model.ui)
         }
         .menuBarExtraStyle(.window)
     }

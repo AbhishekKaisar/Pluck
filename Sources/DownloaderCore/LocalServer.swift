@@ -171,6 +171,9 @@ public struct AddRequest: Codable, Sendable {
     public var cookies: String?
     public var userAgent: String?
     public var fileSize: Int64?
+    /// The browser extension sets this; the app then shows the Add sheet if the user turned that on.
+    /// Scripts leave it out and are never asked.
+    public var ask: Bool?
 }
 
 public enum APIRouter {

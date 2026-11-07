@@ -75,6 +75,7 @@ async function tryCatch(item, late) {
     cookies: cookies || undefined,
     userAgent: navigator.userAgent,
     fileSize: size > 0 ? size : undefined,
+    ask: true,
   });
   if (!result.ok) {
     if (result.status === 401) badge("!", "#c0392b");
@@ -129,6 +130,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       referrer: info.pageUrl || (tab && tab.url) || undefined,
       cookies: (await cookieHeader(url)) || undefined,
       userAgent: navigator.userAgent,
+      ask: true,
     });
     ok = result.ok;
   }

@@ -39,6 +39,10 @@ public struct AddDownloadSheet: View {
                     } else {
                         Text(" ")
                     }
+                    if !ui.waitingDrafts.isEmpty {
+                        Spacer()
+                        Text("\(ui.waitingDrafts.count) more waiting")
+                    }
                 }
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
@@ -118,7 +122,8 @@ public struct AddDownloadSheet: View {
         case .probing:
             HStack(spacing: 6) {
                 ProgressView().controlSize(.mini)
-                Text("Checking the link…").foregroundStyle(.secondary)
+                Text(draft.browserSize.map { "\(Format.bytes($0)), checking the link…" } ?? "Checking the link…")
+                    .foregroundStyle(.secondary)
             }
         case .done(let r):
             HStack(spacing: 10) {
@@ -133,6 +138,7 @@ public struct AddDownloadSheet: View {
             }
             .labelStyle(TightLabel())
         case .failed(let message):
+            if let size = draft.browserSize { Text(Format.bytes(size)).foregroundStyle(.secondary).monospacedDigit() }
             Label(message, systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
                 .labelStyle(TightLabel())
