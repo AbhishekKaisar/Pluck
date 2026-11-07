@@ -103,9 +103,9 @@ A few servers limit how many connections one visitor may open. Lower the number 
 
 ### What happens if Pluck is not running when I click a download?
 
-Pluck starts on its own, in the background, and takes the download. This works once you have opened Pluck at least once, so it could set up the link that lets the browser start it. A download that does not match your filters, or one that arrives while the link is missing, is downloaded by the browser as normal. The extension only cancels the browser's copy after Pluck has accepted the download, so nothing is ever lost.
+Pluck starts on its own, in the background, and takes the download. This works once you have opened Pluck at least once from your Mac (not from the disk image or a disk you eject), so it could set up the link that lets the browser start it. A download that does not match your filters, or one that arrives while the link is missing, is downloaded by the browser as normal. The extension only cancels the browser's copy after Pluck has accepted the download, so nothing is ever lost.
 
-The link is a small script inside the app (`Pluck.app/Contents/MacOS/pluck-host`) and a file Pluck writes into your browser's `NativeMessagingHosts` folder at each launch. If you move Pluck, open it once and the link follows it.
+The link is a small script inside the app (`Pluck.app/Contents/Resources/pluck-host`) and a file Pluck writes into your browser's `NativeMessagingHosts` folder at each launch. If you move Pluck, open it once and the link follows it.
 
 ### Does it work with Firefox?
 
