@@ -60,6 +60,8 @@ Pluck runs on macOS 14 Sonoma or later, on both Apple silicon and Intel Macs.
 4. Pin the extension, then click its icon.
 5. In Pluck, open **Settings** (Cmd+,) and click **Copy** next to the token. Paste it into the extension and click **Save**. The dot turns green when the two are connected.
 
+If you already use an earlier version of the extension, remove it, load the new folder and paste the token once more: the extension now has a fixed ID, so the browser treats it as a new extension and forgets its saved settings.
+
 From then on, downloads of common file types (archives, disk images, installers, video, audio, documents) of 1 MB or more go to Pluck. You can change the list and the minimum size in the extension. To send any link, right-click it and choose **Download with Pluck**.
 
 <p align="center">
@@ -85,7 +87,7 @@ From then on, downloads of common file types (archives, disk images, installers,
 
 Nothing except the downloads themselves. Pluck talks only to the servers you download from. It has no analytics, no crash reporting, no update check and no account. The browser extension talks only to Pluck on your own Mac (`127.0.0.1`), and only with the token from Pluck's Settings, so a web page cannot add downloads. Your list and settings stay in `~/Library/Application Support/Pluck`.
 
-The extension needs permission to read downloads and cookies for all sites. It uses them only to pass a download, with the cookies the browser would have sent for it, to Pluck on your Mac. You can read every line in [`extension/`](extension).
+The extension needs permission to read downloads and cookies for all sites. It uses them only to pass a download, with the cookies the browser would have sent for it, to Pluck on your Mac. It can also ask the browser to run Pluck's small start-up script (native messaging), which only opens the app. You can read every line in [`extension/`](extension).
 
 ### Why is there no Safari extension yet?
 
@@ -101,7 +103,9 @@ A few servers limit how many connections one visitor may open. Lower the number 
 
 ### What happens if Pluck is not running when I click a download?
 
-The browser downloads the file as it normally would. The extension only cancels the browser's copy after Pluck has accepted the download, so nothing is ever lost.
+Pluck starts on its own, in the background, and takes the download. This works once you have opened Pluck at least once, so it could set up the link that lets the browser start it. A download that does not match your filters, or one that arrives while the link is missing, is downloaded by the browser as normal. The extension only cancels the browser's copy after Pluck has accepted the download, so nothing is ever lost.
+
+The link is a small script inside the app (`Pluck.app/Contents/MacOS/pluck-host`) and a file Pluck writes into your browser's `NativeMessagingHosts` folder at each launch. If you move Pluck, open it once and the link follows it.
 
 ### Does it work with Firefox?
 
