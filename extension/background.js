@@ -4,7 +4,7 @@
 
 import {
   getSettings,
-  findApp,
+  ensureApp,
   sendToApp,
   cookieHeader,
   matchesType,
@@ -62,7 +62,7 @@ async function tryCatch(item) {
     badge("!", "#c0392b");
     return false;
   }
-  const port = await findApp(settings);
+  const port = await ensureApp(settings);
   if (!port) return false;
 
   const result = await sendToApp(port, settings.token, {
@@ -98,8 +98,9 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
       suggest();
     } catch {}
   };
-  // Safety net: never hold a download for long, even if something below hangs.
-  const timer = setTimeout(answer, 5000);
+  // Safety net: never hold a download for long, even if something below hangs. Starting the app
+  // can take up to 4 s, hence the longer limit.
+  const timer = setTimeout(answer, 9000);
   tryCatch(item)
     .catch(() => false)
     .then((caught) => {
@@ -117,7 +118,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const url = info.linkUrl || info.srcUrl;
   if (!url || !/^https?:/i.test(url)) return;
   const settings = await getSettings();
-  const port = settings.token ? await findApp(settings) : null;
+  const port = settings.token ? await ensureApp(settings) : null;
   let ok = false;
   if (port) {
     const result = await sendToApp(port, settings.token, {

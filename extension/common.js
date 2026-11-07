@@ -48,6 +48,29 @@ export async function findApp(settings) {
   return null;
 }
 
+export const HOST_NAME = "io.github.abhishekkaisar.pluck";
+
+/** Like findApp, but starts the app through the native messaging host when it is closed.
+ *  Returns null quickly when the host is not installed. Never throws. */
+export async function ensureApp(settings) {
+  try {
+    const port = await findApp(settings);
+    if (port) return port;
+    try {
+      await chrome.runtime.sendNativeMessage(HOST_NAME, { action: "launch" });
+    } catch {
+      return null; // host not installed or app deleted: the browser downloads the file itself
+    }
+    const deadline = Date.now() + 4000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 200));
+      const p = await findApp(settings);
+      if (p) return p;
+    }
+  } catch {}
+  return null;
+}
+
 /** Posts a download to the app. Resolves to { ok, status }. Never throws. */
 export async function sendToApp(port, token, payload) {
   try {
