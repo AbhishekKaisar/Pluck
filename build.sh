@@ -24,6 +24,7 @@ lipo -create $(for b in "${bins[@]}"; do echo "$b/Pluck"; done) -output "$APP/Co
 lipo -create $(for b in "${bins[@]}"; do echo "$b/mdl"; done) -output build/mdl
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/"
+cp Resources/pluck-host "$APP/Contents/MacOS/pluck-host"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
 # Drop local symbols: the app binary shrinks by more than half; no effect on speed.

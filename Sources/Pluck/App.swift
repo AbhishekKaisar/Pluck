@@ -82,6 +82,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = MainActor.assumeIsolated { AppModel.shared }
+        // A test copy (own support folder) must not take over the real registration.
+        let env = ProcessInfo.processInfo.environment
+        let isTestCopy = ["PLUCK_SUPPORT_DIR", "MACDOWNLOADER_SUPPORT_DIR"].contains { !(env[$0] ?? "").isEmpty }
+        if !isTestCopy, let exe = Bundle.main.executableURL {
+            BrowserHost.register(hostPath: exe.deletingLastPathComponent().appendingPathComponent("pluck-host").path,
+                                 home: FileManager.default.homeDirectoryForCurrentUser)
+        }
     }
 
     @objc func handleGetURL(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
