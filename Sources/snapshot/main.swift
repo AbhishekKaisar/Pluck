@@ -142,6 +142,23 @@ MainActor.assumeIsolated {
         let many = AddDraft(text: "https://cdn.example.edu/a.mp4\nhttps://cdn.example.edu/b.mp4\nhttps://cdn.example.edu/c.pdf",
                             fromClipboard: false, settings: settings, probe: .idle)
         render(AddDownloadSheet(draft: many), model: m, size: CGSize(width: 520, height: 290), dark: dark, name: "add-sheet-many")
+        // A browser download waiting for an answer, then the same with a second one behind it.
+        let browser = AddDraft(text: "https://downloads.example.com/reports/annual-2025.pdf", fromClipboard: false,
+                               settings: settings, probe: .done(ProbeResult(fileName: "annual-2025.pdf", totalSize: 18 * MB, acceptsRanges: true)),
+                               headers: RequestHeaders(cookies: "session=sample"), fileName: "Annual Report 2025.pdf", browserSize: 18 * MB)
+        let single = model(items: items)
+        single.ui.present(browser)
+        render(AddDownloadSheet(draft: browser), model: single, size: CGSize(width: 520, height: 330), dark: dark, name: "add-sheet-browser")
+        let second = AddDraft(text: "https://cdn.example.edu/courses/cs451/lecture-08.mp4", fromClipboard: false, settings: settings, probe: .idle,
+                              fileName: "lecture-08.mp4", browserSize: 1_180 * MB)
+        let waiting = model(items: items)
+        waiting.ui.present(browser)
+        waiting.ui.present(second)
+        render(AddDownloadSheet(draft: browser), model: waiting, size: CGSize(width: 520, height: 330), dark: dark, name: "add-sheet-browser-waiting")
+        var asking = settings
+        asking.askWhereToSave = true
+        render(SettingsView().frame(maxHeight: .infinity, alignment: .top).background(Color(nsColor: .windowBackgroundColor)),
+               model: model(items: items, settings: asking), size: CGSize(width: 500, height: 540), dark: dark, name: "settings-ask-on")
         render(SettingsView().frame(maxHeight: .infinity, alignment: .top).background(Color(nsColor: .windowBackgroundColor)),
                model: m, size: CGSize(width: 500, height: 540), dark: dark, name: "settings")
     }

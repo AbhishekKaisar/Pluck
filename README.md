@@ -71,6 +71,7 @@ From then on, downloads of common file types (archives, disk images, installers,
 ## Using Pluck
 
 - **Add a download** with Cmd+N. Pluck picks up a link you have copied, checks its name, size and whether it can resume, and lets you choose the folder and number of connections. Paste many links at once to add them all.
+- **Choose where each download goes.** Turn on "Ask where to save each download" in Settings and the Add sheet opens for every browser download, with the default folder filled in. Click Download to accept it or Change… to pick another folder. Nothing starts until you answer, and downloads that arrive meanwhile wait their turn. Quitting Pluck drops the ones still waiting.
 - **Drag** a link, or a text file of links, onto the window.
 - **Select several** with the checkboxes, Cmd-click or Shift-click, then pause, resume, remove or delete them together.
 - **Sort, filter and search** the list. Pluck remembers your choice.
@@ -106,6 +107,10 @@ A few servers limit how many connections one visitor may open. Lower the number 
 Pluck starts on its own, in the background, and takes the download. This works once you have opened Pluck at least once from your Mac (not from the disk image or a disk you eject), so it could set up the link that lets the browser start it. A download that does not match your filters, or one that arrives while the link is missing, is downloaded by the browser as normal. The extension only cancels the browser's copy after Pluck has accepted the download, so nothing is ever lost.
 
 The link is a small script inside the app (`Pluck.app/Contents/Resources/pluck-host`) and a file Pluck writes into your browser's `NativeMessagingHosts` folder at each launch. If you move Pluck, open it once and the link follows it.
+
+### Where do my downloads go?
+
+Into the default folder in Settings (Downloads by default). To choose a folder each time, turn on "Ask where to save each download": browser downloads then open the Add sheet first. Downloads you add yourself with Cmd+N always show it, and `mdl` never asks.
 
 ### Does it work with Firefox?
 
