@@ -37,8 +37,9 @@ function sizeOf(item) {
   return -1;
 }
 
-/** Returns true when the app took the download and the browser copy was cancelled. */
-async function tryCatch(item) {
+/** Returns true when the app took the download and the browser copy was cancelled.
+ *  `late()` says the browser already has the download back, so the app must not get it as well. */
+async function tryCatch(item, late) {
   const settings = await getSettings();
   if (!settings.enabled) return false;
   const url = item.finalUrl || item.url;
@@ -65,11 +66,13 @@ async function tryCatch(item) {
   const port = await ensureApp(settings);
   if (!port) return false;
 
+  const cookies = await cookieHeader(url);
+  if (late()) return false;
   const result = await sendToApp(port, settings.token, {
     url,
     filename: name || undefined,
     referrer: item.referrer || undefined,
-    cookies: (await cookieHeader(url)) || undefined,
+    cookies: cookies || undefined,
     userAgent: navigator.userAgent,
     fileSize: size > 0 ? size : undefined,
   });
@@ -99,9 +102,9 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
     } catch {}
   };
   // Safety net: never hold a download for long, even if something below hangs. Starting the app
-  // can take up to 4 s, hence the longer limit.
+  // can take up to 5 s and handing it over up to 3 s, hence the longer limit.
   const timer = setTimeout(answer, 9000);
-  tryCatch(item)
+  tryCatch(item, () => answered)
     .catch(() => false)
     .then((caught) => {
       clearTimeout(timer);
