@@ -15,7 +15,7 @@ let package = Package(
         // Renders the real views with sample data into build/snapshots/*.png (no screen recording needed).
         .executableTarget(name: "snapshot", dependencies: ["DownloaderCore", "PluckUI"]),
         .executableTarget(name: "mdl", dependencies: ["DownloaderCore"]),
-        .testTarget(name: "DownloaderCoreTests", dependencies: ["DownloaderCore"]),
+        .testTarget(name: "DownloaderCoreTests", dependencies: ["DownloaderCore", "PluckUI"]),
     ],
     swiftLanguageModes: [.v5]
 )

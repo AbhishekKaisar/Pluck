@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- New setting, "Ask where to save each download" (off by default). When it is on, each browser download opens the Add sheet with its name, size and the default folder, and starts only when you click Download. Downloads that arrive meanwhile wait their turn, and the sheet comes forward even when the window is closed. If you quit with some still unanswered, they stay in the list, paused. The Folder row in Settings is now called "Default folder". Reload the extension for this to apply to its downloads.
 - The browser extension now starts Pluck when it is closed, so a download is caught even when the app is not running. Pluck registers a small start-up script with Chrome, Edge, Brave, Vivaldi, Arc and Chromium each time it opens, so open it once after updating.
 - The extension has a fixed ID now. If you already use it, remove it, load the new folder and paste the token again: the browser treats it as a new extension and forgets the saved token.
 

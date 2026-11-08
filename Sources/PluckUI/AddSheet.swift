@@ -21,7 +21,12 @@ public struct AddDownloadSheet: View {
                     .font(.system(size: 13))
                     .lineLimit(1...5)
                     .focused($linksFocused)
-                    .onSubmit { commit(later: false) }
+                    .onSubmit {
+                        // A field also submits when it merely ends editing (the sheet losing focus to
+                        // the Change… panel). Only a real Return or Enter press may add the download.
+                        let e = NSApp.currentEvent
+                        if SubmitKey.isReturn(type: e?.type, keyCode: e?.keyCode) { commit(later: false) }
+                    }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
                     .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color(nsColor: .textBackgroundColor)))
@@ -38,6 +43,10 @@ public struct AddDownloadSheet: View {
                         Text("No http or https link found")
                     } else {
                         Text(" ")
+                    }
+                    if !ui.waitingDrafts.isEmpty {
+                        Spacer()
+                        Text("\(ui.waitingDrafts.count) more waiting")
                     }
                 }
                 .font(.system(size: 11))
@@ -87,7 +96,11 @@ public struct AddDownloadSheet: View {
         }
         .padding(20)
         .frame(width: 520)
-        .onAppear { if draft.text.isEmpty { linksFocused = true } }
+        .onAppear {
+            draft.begin(settings: manager.settings)
+            if draft.text.isEmpty { linksFocused = true }
+        }
+        .background(QuitsWithSheetOpen())
     }
 
     @ViewBuilder private var fileCard: some View {
@@ -118,11 +131,12 @@ public struct AddDownloadSheet: View {
         case .probing:
             HStack(spacing: 6) {
                 ProgressView().controlSize(.mini)
-                Text("Checking the link…").foregroundStyle(.secondary)
+                Text(draft.caughtSize.map { "\(Format.bytes($0)), checking the link…" } ?? "Checking the link…")
+                    .foregroundStyle(.secondary)
             }
         case .done(let r):
             HStack(spacing: 10) {
-                Text(r.totalSize.map(Format.bytes) ?? "Size unknown").foregroundStyle(.secondary).monospacedDigit()
+                Text(draft.size.map(Format.bytes) ?? "Size unknown").foregroundStyle(.secondary).monospacedDigit()
                 if r.acceptsRanges {
                     Label("Resumable, splits across connections", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
@@ -133,6 +147,7 @@ public struct AddDownloadSheet: View {
             }
             .labelStyle(TightLabel())
         case .failed(let message):
+            if let size = draft.caughtSize { Text(Format.bytes(size)).foregroundStyle(.secondary).monospacedDigit() }
             Label(message, systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
                 .labelStyle(TightLabel())
@@ -146,7 +161,7 @@ public struct AddDownloadSheet: View {
     }
 
     private func commit(later: Bool) {
-        guard !draft.links.isEmpty else { return }
+        guard !draft.links.isEmpty, !draft.committed else { return }
         draft.commit(to: manager, later: later)
         ui.addDraft = nil
     }
@@ -162,8 +177,24 @@ public struct AddDownloadSheet: View {
     }
 }
 
+/// A sheet refuses Quit and logout by default, without a word and before the app delegate hears of it.
+/// One can open on its own here, so it must not hold the app open.
+private struct QuitsWithSheetOpen: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { NSView() }
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async { view.window?.preventsApplicationTerminationWhenModal = false }
+    }
+}
+
 struct TightLabel: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: 4) { configuration.icon; configuration.title }
+    }
+}
+
+/// Whether a text field submit came from the Return or Enter key, rather than from ending editing.
+enum SubmitKey {
+    static func isReturn(type: NSEvent.EventType?, keyCode: UInt16?) -> Bool {
+        type == .keyDown && (keyCode == 36 || keyCode == 76)
     }
 }

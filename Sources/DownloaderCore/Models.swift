@@ -90,21 +90,25 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var speedLimitKiB: Int
     /// The limit the speed-limit toggle applies, remembered while the limit is off.
     public var speedLimitValueKiB: Int
+    /// Show the Add sheet for each browser download, so the folder can be changed before it starts.
+    public var askWhereToSave: Bool
 
     public init(downloadDirectory: String = (NSHomeDirectory() as NSString).appendingPathComponent("Downloads"),
-                connections: Int = 16, maxConcurrent: Int = 3, speedLimitKiB: Int = 0, speedLimitValueKiB: Int? = nil) {
+                connections: Int = 16, maxConcurrent: Int = 3, speedLimitKiB: Int = 0, speedLimitValueKiB: Int? = nil,
+                askWhereToSave: Bool = false) {
         self.downloadDirectory = downloadDirectory
         self.connections = connections
         self.maxConcurrent = maxConcurrent
         self.speedLimitKiB = speedLimitKiB
         self.speedLimitValueKiB = speedLimitValueKiB ?? (speedLimitKiB > 0 ? speedLimitKiB : 1024)
+        self.askWhereToSave = askWhereToSave
     }
 
     private enum CodingKeys: String, CodingKey {
-        case downloadDirectory, connections, maxConcurrent, speedLimitKiB, speedLimitValueKiB
+        case downloadDirectory, connections, maxConcurrent, speedLimitKiB, speedLimitValueKiB, askWhereToSave
     }
 
-    /// Settings files written before the speed-limit toggle have no `speedLimitValueKiB`.
+    /// Settings files written before the speed-limit toggle have no `speedLimitValueKiB`, and files before the ask-where-to-save option have no `askWhereToSave`.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = AppSettings()
@@ -112,7 +116,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
                   connections: try c.decodeIfPresent(Int.self, forKey: .connections) ?? d.connections,
                   maxConcurrent: try c.decodeIfPresent(Int.self, forKey: .maxConcurrent) ?? d.maxConcurrent,
                   speedLimitKiB: try c.decodeIfPresent(Int.self, forKey: .speedLimitKiB) ?? 0,
-                  speedLimitValueKiB: try c.decodeIfPresent(Int.self, forKey: .speedLimitValueKiB))
+                  speedLimitValueKiB: try c.decodeIfPresent(Int.self, forKey: .speedLimitValueKiB),
+                  askWhereToSave: try c.decodeIfPresent(Bool.self, forKey: .askWhereToSave) ?? false)
     }
 
     public var speedLimitOn: Bool { speedLimitKiB > 0 }

@@ -4,15 +4,31 @@ import DownloaderCore
 
 public struct MenuBarLabel: View {
     @ObservedObject var manager: DownloadManager
+    let ui: ListState
+    @Environment(\.openWindow) private var openWindow
 
-    public init(manager: DownloadManager) { self.manager = manager }
+    public init(manager: DownloadManager, ui: ListState) {
+        self.manager = manager
+        self.ui = ui
+    }
 
+    // This view lives as long as the app does, so it can bring up the window for a sheet that needs an answer.
     public var body: some View {
-        if manager.totalSpeed > 0 {
-            Text("↓ \(Format.speed(manager.totalSpeed))").monospacedDigit()
-        } else {
-            Image(systemName: "arrow.down.circle")
+        Group {
+            if manager.totalSpeed > 0 {
+                Text("↓ \(Format.speed(manager.totalSpeed))").monospacedDigit()
+            } else {
+                Image(systemName: "arrow.down.circle")
+            }
         }
+        .onReceive(ui.needsAttention) { bringForward() }
+        // A cold start from the browser can queue a draft before this view exists.
+        .onAppear { if ui.addDraft != nil { bringForward() } }
+    }
+
+    private func bringForward() {
+        openWindow(id: "main")
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 

@@ -31,7 +31,7 @@ struct PluckApp: App {
                 .environmentObject(model)
                 .environmentObject(model.manager)
         } label: {
-            MenuBarLabel(manager: model.manager)
+            MenuBarLabel(manager: model.manager, ui: model.ui)
         }
         .menuBarExtraStyle(.window)
     }
@@ -94,6 +94,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        MainActor.assumeIsolated { AppModel.shared.ui.parkBrowserDrafts(in: AppModel.shared.manager) }
+        return .terminateNow
+    }
 
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated {

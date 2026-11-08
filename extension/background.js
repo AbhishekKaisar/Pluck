@@ -1,6 +1,7 @@
 // Pluck service worker.
 // Catches browser downloads and hands them to the app on 127.0.0.1. The rule that matters most:
 // the browser download is cancelled only after the app has accepted it, so nothing is ever lost.
+// "Accepted" can mean queued for the user's answer; the app keeps those if it quits before one comes.
 
 import {
   getSettings,
@@ -75,6 +76,7 @@ async function tryCatch(item, late) {
     cookies: cookies || undefined,
     userAgent: navigator.userAgent,
     fileSize: size > 0 ? size : undefined,
+    ask: true,
   });
   if (!result.ok) {
     if (result.status === 401) badge("!", "#c0392b");
@@ -129,6 +131,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       referrer: info.pageUrl || (tab && tab.url) || undefined,
       cookies: (await cookieHeader(url)) || undefined,
       userAgent: navigator.userAgent,
+      ask: true,
     });
     ok = result.ok;
   }
