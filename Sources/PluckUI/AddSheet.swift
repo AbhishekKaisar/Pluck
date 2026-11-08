@@ -21,7 +21,12 @@ public struct AddDownloadSheet: View {
                     .font(.system(size: 13))
                     .lineLimit(1...5)
                     .focused($linksFocused)
-                    .onSubmit { commit(later: false) }
+                    .onSubmit {
+                        // A field also submits when it merely ends editing (the sheet losing focus to
+                        // the Change… panel). Only a real Return or Enter press may add the download.
+                        let e = NSApp.currentEvent
+                        if SubmitKey.isReturn(type: e?.type, keyCode: e?.keyCode) { commit(later: false) }
+                    }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
                     .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color(nsColor: .textBackgroundColor)))
@@ -156,7 +161,7 @@ public struct AddDownloadSheet: View {
     }
 
     private func commit(later: Bool) {
-        guard !draft.links.isEmpty else { return }
+        guard !draft.links.isEmpty, !draft.committed else { return }
         draft.commit(to: manager, later: later)
         ui.addDraft = nil
     }
@@ -184,5 +189,12 @@ private struct QuitsWithSheetOpen: NSViewRepresentable {
 struct TightLabel: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: 4) { configuration.icon; configuration.title }
+    }
+}
+
+/// Whether a text field submit came from the Return or Enter key, rather than from ending editing.
+enum SubmitKey {
+    static func isReturn(type: NSEvent.EventType?, keyCode: UInt16?) -> Bool {
+        type == .keyDown && (keyCode == 36 || keyCode == 76)
     }
 }

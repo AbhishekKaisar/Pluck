@@ -149,6 +149,7 @@ public final class ListState: ObservableObject {
 /// The Add download sheet's state. One link is probed for its name, size and resume support.
 @MainActor
 public final class AddDraft: ObservableObject, Identifiable {
+    private(set) var committed = false
     public enum Probe: Equatable {
         case idle, probing, done(ProbeResult), failed(String)
     }
@@ -281,6 +282,9 @@ public final class AddDraft: ObservableObject, Identifiable {
     /// Adds every link; returns how many were added.
     @discardableResult
     func commit(to manager: DownloadManager, later: Bool) -> Int {
+        // A second call for the same draft (a double submit path) must not add the links again.
+        guard !committed else { return 0 }
+        committed = true
         task?.cancel()
         let links = self.links
         let single = links.count == 1

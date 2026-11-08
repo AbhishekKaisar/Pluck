@@ -290,3 +290,29 @@ private func draft(_ url: String, settings: AppSettings = AppSettings(downloadDi
         #expect(m.ui.addDraft == nil)
     }
 }
+
+@Suite struct SubmitKeyTests {
+    @Test func returnAndEnterKeyDownCommit() {
+        #expect(SubmitKey.isReturn(type: .keyDown, keyCode: 36) == true)
+        #expect(SubmitKey.isReturn(type: .keyDown, keyCode: 76) == true)
+    }
+
+    @Test func everythingElseDoesNot() {
+        #expect(SubmitKey.isReturn(type: nil, keyCode: nil) == false)
+        #expect(SubmitKey.isReturn(type: .leftMouseUp, keyCode: nil) == false)
+        #expect(SubmitKey.isReturn(type: .keyDown, keyCode: 0) == false)
+        #expect(SubmitKey.isReturn(type: .keyUp, keyCode: 36) == false)
+    }
+}
+
+@MainActor
+@Suite struct CommitOnceTests {
+    @Test func secondCommitOfTheSameDraftAddsNothing() {
+        let manager = DownloadManager(inMemory: [], settings: AppSettings(downloadDirectory: "/tmp/ask-default"))
+        let d = draft("https://example.com/once.bin")
+        #expect(d.commit(to: manager, later: false) == 1)
+        #expect(d.commit(to: manager, later: false) == 0)
+        #expect(d.commit(to: manager, later: true) == 0)
+        #expect(manager.items.count == 1)
+    }
+}
